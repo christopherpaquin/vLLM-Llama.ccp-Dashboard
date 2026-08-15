@@ -1,4 +1,4 @@
-# vLLM Dashboard — Implementation Status
+# Infrence Engine Dashboard — Implementation Status
 
 Last verified: 2026-08-15
 
@@ -14,7 +14,7 @@ stubs are not counted as complete.
 | NVIDIA telemetry | Partial | A narrow `nvidia-smi` CSV parser exists. NVML preference, identity, temperature, power, clocks, processes, robust unavailable values, and tests are missing. |
 | Multi-GPU handling | Partial | Data structures are collections and the NVIDIA parser can return multiple rows, but no tested discovery/dashboard integration exists. |
 | Runtime discovery | Partial | Docker and Docker Compose discovery is tested and live-validated on scar. Other target runtimes remain missing; scar correctly reports no Podman. |
-| Inference connectivity and metrics | Partial | vLLM health/model/metrics/KV discovery is tested and live-validated. llama.cpp health, model, properties, optional metrics, and throughput normalization are mocked/tested against its official API contract; live llama.cpp validation remains. |
+| Inference connectivity and metrics | Partial | vLLM health/model/metrics/KV discovery is tested and live-validated. llama.cpp health, model, properties, optional metrics, and throughput normalization are tested against its official API contract and live-validated on scar. |
 | Lifecycle management | Safe preview only | Exact Docker Compose actions are derived from existing labels. The adapter validates file/service inputs and raises `LifecycleDisabled` for every mutation until preservation and restore gates exist. |
 | Model records | Partial | Active models/profiles can be synchronized. Bounded read-only discovery supports Hugging Face snapshots for vLLM and GGUF files for llama.cpp. Metadata/downloads and removal safeguards remain missing. |
 | Compatibility assessment | Stub | Endpoint echoes/defaults fields and does not perform the required advisory assessment. |
@@ -28,13 +28,13 @@ stubs are not counted as complete.
 | Operation history and logs | Partial | A generic log table and unvalidated endpoints exist. Lifecycle event capture, bounded/tailable manager and vLLM logs, and access scoping are missing. |
 | Health reporting | Partial | Manager response, database, vLLM API, metrics, and GPU telemetry checks are implemented and live-tested. Adapter failure detail can be expanded. |
 | Authentication and authorization | Missing | No authentication, sessions, password hashing, logout, or rate limiting exists. |
-| Frontend | Partial | A responsive appliance-style dashboard is deployed on scar with host identity/hardware, active model/health, VRAM/GPU/KV summaries, collapsed tunables, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
+| Frontend | Partial | The Infrence Engine Dashboard is deployed on scar with host identity/hardware, active model/health, VRAM/GPU/KV summaries, collapsed tunables, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
 | Containerized deployment | Complete for scar baseline | One-click Docker Compose deployment uses pinned images, a non-root/read-only portal, least-privilege Docker socket proxy, persistent data, healthcheck, and `unless-stopped` boot restart. Live deployed on scar. |
 | Backup / uninstall | Complete for scar baseline | Tested scripts back up persistent data and uninstall containers while preserving data by default. Purge is restricted to the exact portal data path and never touches vLLM. |
-| Automated tests | Partial | 32 pytest and 9 BATS tests cover backend/dashboard behavior, vLLM/llama.cpp provider parsing/configuration, image pinning, container identity, restart policy, read-only cache/AMD identity mounting, AMD SMI, and shell safety. Broader browser/matrix/security coverage remains. |
+| Automated tests | Partial | 32 pytest and 9 BATS tests cover backend/dashboard behavior (including product-title presence), vLLM/llama.cpp provider parsing/configuration, image pinning, container identity, restart policy, read-only cache/AMD identity mounting, AMD SMI, and shell safety. Broader browser/matrix/security coverage remains. |
 | CI and pre-commit | Partial | Local pre-commit syntax, secret detection, and exact image-pin gates exist; hosted CI remains missing. |
 | Documentation | Partial | README documents deployment, development, health, backup, and uninstall. Dedicated architecture, security, and benchmark guides remain missing. |
-| Live validation on `scar.lab` | Partial | Portal is running healthy on port 8088 with AMD SMI, Docker/vLLM discovery, durable storage, and boot restart. Existing vLLM container ID/configuration remained unchanged; no lifecycle command was executed. |
+| Live validation on `scar.lab` | Partial | Portal is running healthy on port 8088 with AMD SMI, Docker/llama.cpp discovery, durable storage, and boot restart. The existing healthy llama.cpp container remained unchanged; no lifecycle command was executed. |
 
 ## Current milestone
 
