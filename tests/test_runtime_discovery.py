@@ -12,15 +12,22 @@ from core.runtime_discovery import (
 )
 
 
-def test_host_discovery_reads_linux_release(tmp_path: Path) -> None:
+def test_host_discovery_reads_linux_release(tmp_path: Path, monkeypatch) -> None:
     release = tmp_path / "os-release"
+    cpuinfo = tmp_path / "cpuinfo"
     release.write_text('ID="ubuntu"\nNAME="Ubuntu"\nVERSION_ID="24.04"\n')
+    cpuinfo.write_text("model name : Test CPU 9000\n")
+    monkeypatch.setenv("VLLM_HOSTNAME", "configured-host")
+    monkeypatch.setenv("HOST_PRIMARY_IP", "192.0.2.10")
 
-    result = HostDiscovery(release).discover()
+    result = HostDiscovery(release, cpuinfo).discover()
 
     assert result["os_id"] == "ubuntu"
     assert result["os_version"] == "24.04"
     assert result["memory_total_bytes"] > 0
+    assert result["cpu_model"] == "Test CPU 9000"
+    assert result["hostname"] == "configured-host"
+    assert result["primary_ip"] == "192.0.2.10"
 
 
 def test_docker_compose_discovery_and_safe_preview() -> None:

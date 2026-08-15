@@ -1,3 +1,3 @@
 """
-vLLM Management Portal - Backend
+vLLM Dashboard - Backend
 """

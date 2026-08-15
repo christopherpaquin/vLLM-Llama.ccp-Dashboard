@@ -44,13 +44,15 @@ def test_amd_smi_is_preferred_and_normalized() -> None:
         {
             "gpu": 0,
             "process_list": [
+                "N/A",
                 {
                     "process_info": {
                         "pid": 42,
                         "name": "vllm",
                         "memory_usage": {"vram_mem": {"value": 1234}},
                     }
-                }
+                },
+                {"process_info": "N/A"},
             ],
         }
     ]
@@ -72,6 +74,7 @@ def test_amd_smi_is_preferred_and_normalized() -> None:
     assert gpu.vram_free == 8000 * 1024**2
     assert gpu.power_draw == 80
     assert gpu.processes[0]["vram_bytes"] == 1234
+    assert len(gpu.processes) == 1
     assert gpu.compute_runtime_version == "7.2.2"
 
 

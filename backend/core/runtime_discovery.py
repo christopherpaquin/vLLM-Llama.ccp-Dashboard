@@ -49,17 +49,21 @@ def read_text(url: str, timeout: float = 3.0) -> tuple[bool, str | None]:
 class HostDiscovery:
     """Collect normalized, non-destructive Linux host capabilities."""
 
-    def __init__(self, os_release: Path | None = None) -> None:
+    def __init__(
+        self, os_release: Path | None = None, cpuinfo: Path | None = None
+    ) -> None:
         self.os_release = os_release or Path(
             os.getenv("HOST_OS_RELEASE_PATH", "/etc/os-release")
         )
+        self.cpuinfo = cpuinfo or Path("/proc/cpuinfo")
 
     def discover(self) -> dict[str, Any]:
         release = self._read_os_release()
         memory = psutil.virtual_memory()
         root_storage = shutil.disk_usage("/")
         return {
-            "hostname": socket.gethostname(),
+            "hostname": os.getenv("VLLM_HOSTNAME") or socket.gethostname(),
+            "primary_ip": os.getenv("HOST_PRIMARY_IP") or "Unknown",
             "os_id": release.get("ID", "unknown"),
             "os_name": release.get("NAME", "Unknown"),
             "os_version": release.get("VERSION_ID", "Unknown"),
@@ -74,6 +78,7 @@ class HostDiscovery:
             ),
             "cpu_logical_count": psutil.cpu_count(logical=True),
             "cpu_physical_count": psutil.cpu_count(logical=False),
+            "cpu_model": self._cpu_model(),
             "memory_total_bytes": memory.total,
             "memory_available_bytes": memory.available,
             "root_storage_total_bytes": root_storage.total,
@@ -81,6 +86,15 @@ class HostDiscovery:
             "selinux": self._selinux_status(),
             "apparmor": self._apparmor_status(),
         }
+
+    def _cpu_model(self) -> str:
+        try:
+            for line in self.cpuinfo.read_text(encoding="utf-8").splitlines():
+                if line.lower().startswith("model name") and ":" in line:
+                    return line.split(":", 1)[1].strip()
+        except OSError:
+            pass
+        return platform.processor() or "Unknown"
 
     def _read_os_release(self) -> dict[str, str]:
         try:

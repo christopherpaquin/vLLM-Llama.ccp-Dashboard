@@ -150,7 +150,11 @@ class AMDGPUProvider(GPUProvider):
     def _parse_amd_processes(data: dict[str, Any]) -> list[dict[str, Any]]:
         parsed = []
         for entry in data.get("process_list", []):
+            if not isinstance(entry, dict):
+                continue
             info = entry.get("process_info", {})
+            if not isinstance(info, dict):
+                continue
             parsed.append(
                 {
                     "pid": info.get("pid"),

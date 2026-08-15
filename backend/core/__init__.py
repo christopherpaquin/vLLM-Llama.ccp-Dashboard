@@ -1,3 +1,3 @@
 """
-vLLM Management Portal - Core Package
+vLLM Dashboard - Core Package
 """

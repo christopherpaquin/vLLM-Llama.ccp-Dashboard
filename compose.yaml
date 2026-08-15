@@ -28,7 +28,7 @@ services:
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12.13-slim-trixie}
     container_name: vllm-management-portal
-    hostname: ${HOST_HOSTNAME:-vllm-host}
+    hostname: vllm-dashboard
     restart: ${RESTART_POLICY:-unless-stopped}
     depends_on:
       docker-socket-proxy:
@@ -37,6 +37,8 @@ services:
       DATABASE_URL: sqlite:////data/vllm_portal.db
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       HOST_OS_RELEASE_PATH: /host/etc/os-release
+      VLLM_HOSTNAME: ${VLLM_HOSTNAME:-vllm-host}
+      HOST_PRIMARY_IP: ${HOST_PRIMARY_IP:-Unknown}
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000}
       ROCM_PATH: /opt/rocm-host
       MODEL_CACHE_PATH: /host/model-cache

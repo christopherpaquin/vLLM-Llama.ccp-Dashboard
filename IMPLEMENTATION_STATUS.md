@@ -1,4 +1,4 @@
-# vLLM Management Portal — Implementation Status
+# vLLM Dashboard — Implementation Status
 
 Last verified: 2026-08-15
 
@@ -9,7 +9,7 @@ stubs are not counted as complete.
 | --- | --- | --- |
 | FastAPI application shell | Partial | Application and routes run in the pinned production container; schema migrations remain absent. |
 | SQLite persistence | Partial | Deployment persists SQLite under `/var/lib/vllm-management-portal`; migrations and broader relationship constraints remain missing. |
-| Host discovery | Complete for scar baseline | Tested read-only discovery reports OS, hostname, kernel, architecture, uptime, CPU, memory, root storage, SELinux, and AppArmor. Additional filesystem detail and multi-distribution live validation remain. |
+| Host discovery | Complete for scar baseline | Tested read-only discovery reports hostname, primary IP, OS, kernel, architecture, uptime, CPU model/counts, memory, root storage, SELinux, and AppArmor. Additional filesystem detail and multi-distribution live validation remain. |
 | AMD telemetry | Complete for scar baseline | AMD SMI is preferred with tested ROCm SMI fallback. Normalized bytes, utilization, temperature, power, clocks, identity, ROCm, and process VRAM work live on scar. |
 | NVIDIA telemetry | Partial | A narrow `nvidia-smi` CSV parser exists. NVML preference, identity, temperature, power, clocks, processes, robust unavailable values, and tests are missing. |
 | Multi-GPU handling | Partial | Data structures are collections and the NVIDIA parser can return multiple rows, but no tested discovery/dashboard integration exists. |
@@ -28,7 +28,7 @@ stubs are not counted as complete.
 | Operation history and logs | Partial | A generic log table and unvalidated endpoints exist. Lifecycle event capture, bounded/tailable manager and vLLM logs, and access scoping are missing. |
 | Health reporting | Partial | Manager response, database, vLLM API, metrics, and GPU telemetry checks are implemented and live-tested. Adapter failure detail can be expanded. |
 | Authentication and authorization | Missing | No authentication, sessions, password hashing, logout, or rate limiting exists. |
-| Frontend | Partial | A responsive appliance-style dashboard is deployed on scar with active model/health, VRAM/GPU/KV summaries, collapsed tunables, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
+| Frontend | Partial | A responsive appliance-style dashboard is deployed on scar with host identity/hardware, active model/health, VRAM/GPU/KV summaries, collapsed tunables, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
 | Containerized deployment | Complete for scar baseline | One-click Docker Compose deployment uses pinned images, a non-root/read-only portal, least-privilege Docker socket proxy, persistent data, healthcheck, and `unless-stopped` boot restart. Live deployed on scar. |
 | Backup / uninstall | Complete for scar baseline | Tested scripts back up persistent data and uninstall containers while preserving data by default. Purge is restricted to the exact portal data path and never touches vLLM. |
 | Automated tests | Partial | 25 pytest and 6 BATS tests cover backend/dashboard behavior plus image pinning, restart policy, read-only cache mounting, AMD SMI mounting, and shell safety. Broader browser/matrix/security coverage remains. |

@@ -1,140 +1,139 @@
-# vLLM Management Portal
+# vLLM Dashboard
 
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI 0.110](https://img.shields.io/badge/FastAPI-0.110-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Docker Compose](https://img.shields.io/badge/Deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 ![Tested on Ubuntu 24.04](https://img.shields.io/badge/Tested-Ubuntu%2024.04-E95420?logo=ubuntu&logoColor=white)
 ![Tested with AMD ROCm](https://img.shields.io/badge/Tested-AMD%20ROCm-ED1C24?logo=amd&logoColor=white)
 
-An early-stage management and observability application for existing vLLM
-deployments. The intended product provides portable host/GPU discovery, safe
-runtime profiles and lifecycle operations, model management, detailed memory
-accounting, and reproducible benchmarks. It is not a chat frontend.
+A compact operations dashboard for observing, tuning, and benchmarking an
+existing vLLM deployment. It is an infrastructure interface, not a chat UI.
 
-> **Development status:** The repository contains a deployable FastAPI/SQLite
-> backend foundation. Lifecycle execution remains disabled and the older
-> mutation-provider prototypes must not be used on a production vLLM host. There is no
-> frontend yet. See
-> [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for the verified feature
-> matrix and [GOALS.md](GOALS.md) for the authoritative requirements.
+## 🎯 What it shows
 
-## Architecture
+The landing page puts the current runtime first:
 
-The architecture keeps the existing vLLM deployment independent and
-isolates platform-specific behavior behind system, GPU telemetry, container
-runtime, and lifecycle providers. The current code establishes provider
-interfaces, SQLAlchemy entities, and a versioned HTTP API. Read-only Linux,
-AMD SMI/ROCm SMI, Docker Compose, and vLLM endpoint discovery have been live
-validated on `scar.lab`.
+| Area | Information | Status |
+| --- | --- | --- |
+| Host | Hostname, primary IP, OS/kernel, CPU model, total RAM | ✅ Live |
+| Model | Active repository, served name, API and metrics health | ✅ Live |
+| GPU | Utilization, VRAM, temperature, power, headroom | ✅ Live on AMD SMI |
+| KV cache | Utilization, allocation, token capacity, concurrency | ✅ Where vLLM reports it |
+| Models | Complete repositories in the read-only Hugging Face cache | ✅ Live |
+| Benchmark | TTFT, output tokens/second, end-to-end latency | ✅ Bounded streaming test |
+| Switching | Activate a different cached model | ⚠️ Safety-locked |
 
-The root page is a concise operational dashboard showing the active model,
-vLLM health, GPU utilization, VRAM/KV usage, headroom, current tunables, and
-a measured interactive benchmark. Its model selector is populated from the
-read-only local Hugging Face cache. Activation remains deliberately disabled
-until safe rollback is implemented.
+Advanced vLLM configuration and memory detail stays collapsed until needed.
+Unavailable values are labeled explicitly rather than estimated.
 
-## Deployment
+## 🧭 How it works
 
-The supported scar deployment requires Ubuntu 24.04, Docker Engine with the
-Compose plugin, the existing ROCm installation, and a healthy vLLM endpoint.
-No Python virtual environment is needed on the deployment host.
+```text
+┌──────────────────────────┐
+│ Browser dashboard :8088 │
+└────────────┬─────────────┘
+             │ normalized HTTP API
+┌────────────▼─────────────┐
+│ FastAPI portal           │
+│ SQLite history           │
+└──────┬───────────┬───────┘
+       │           │
+       │           └──────────────┐
+┌──────▼────────┐  ┌──────────────▼─────────────┐
+│ AMD SMI/ROCm  │  │ vLLM API, metrics, Docker │
+│ host telemetry│  │ and read-only model cache │
+└───────────────┘  └────────────────────────────┘
+```
+
+The portal runs separately from vLLM. It reads GPU devices, the configured
+ROCm installation, vLLM endpoints, Docker metadata through a restricted
+socket proxy, and the Hugging Face cache through a read-only mount. Lifecycle
+mutations remain disabled until configuration preservation and rollback are
+fully implemented.
+
+## 🚀 Deploy
+
+Requirements are Ubuntu 24.04, Docker Engine with the Compose plugin, a local
+ROCm installation, and an existing vLLM endpoint.
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-That one command validates prerequisites, creates `.env` from the committed
-template when needed, builds the pinned portal image, starts the portal and its
-read-only Docker API proxy, and waits for health. Open the API documentation at
-`http://scar.lab:8088/`, browse API documentation at
-`http://scar.lab:8088/docs`, or query health at
-`http://scar.lab:8088/api/v1/health`.
+The idempotent deploy command creates `.env` from `.env-template` when needed,
+builds the pinned image, starts the stack, and waits for application health.
+Open `http://scar.lab:8088/`. Both containers use `restart: unless-stopped`, so
+the portal returns automatically when the Docker service starts at boot.
 
-Both containers use Docker's `unless-stopped` restart policy. Because Docker is
-enabled at boot on scar, the deployment starts after a reboot without a venv,
-interactive shell, or separate systemd unit. The portal is isolated from the
-existing vLLM Compose project and does not mount its configuration or model
-cache.
+## ⚙️ Configuration
 
-Configuration belongs in the ignored `.env`; `.env-template` documents all
-settings. Operational commands are:
+Edit the ignored `.env` and rerun `./scripts/deploy.sh`. Do not hand-edit the
+running containers.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `PORTAL_PORT` | `8088` | Dashboard port |
+| `PORTAL_DATA_DIR` | `/var/lib/vllm-management-portal` | Persistent SQLite data |
+| `VLLM_BASE_URL` | `http://host.docker.internal:8000` | Existing vLLM API |
+| `VLLM_HOSTNAME` | `vllm-host` | Host name displayed on the dashboard |
+| `ROCM_PATH` | `/opt/rocm-7.2.2` | Host ROCm installation |
+| `MODEL_CACHE_PATH` | `/var/lib/vllm/huggingface/hub` | Read-only model cache |
+| `RESTART_POLICY` | `unless-stopped` | Docker restart behavior |
+
+## 🧪 Benchmark
+
+Select **Run TTFT + token rate test** on the dashboard. The portal sends one
+deterministic, bounded streaming request to the active model and persists:
+
+- time to first token;
+- output tokens per second;
+- end-to-end latency;
+- prompt/output token counts and raw stream evidence.
+
+This quick test verifies interactive behavior; it is not a percentile-based
+load benchmark.
+
+## 🛠️ Operations
 
 ```bash
-./scripts/status.sh
 ./healthcheck.sh
+./scripts/status.sh
 ./scripts/backup.sh
 ./scripts/uninstall.sh
 ```
 
-Uninstall preserves `/var/lib/vllm-management-portal` by default. The explicit
-`--purge-data` option permanently removes only that validated path. Neither mode
-changes the vLLM deployment, image, or model cache.
+`uninstall.sh` preserves portal data. `uninstall.sh --purge-data` removes only
+the validated portal data path. Neither operation changes the existing vLLM
+deployment, image, configuration, or cached models.
 
-## Development requirements
-
-- Python 3.12
-- A virtual environment
-- SQLite (provided through Python)
-
-AMD/NVIDIA tooling and a running vLLM service are not required for the unit/API
-test suite. BATS is required for deployment-script tests.
-
-## Development setup
+## 🧑‍💻 Development and tests
 
 ```bash
 python3.12 -m venv venv
-venv/bin/pip install -r backend/requirements.txt
+venv/bin/pip install -r backend/requirements-dev.txt
+venv/bin/pytest -q
+bats tests/deployment.bats
 ```
 
-Start the development API from the backend directory:
+Start a development server with:
 
 ```bash
 cd backend
 ../venv/bin/uvicorn main:app --reload
 ```
 
-The API is available at `http://localhost:8000`; interactive OpenAPI
-documentation is at `http://localhost:8000/docs`.
+API documentation is available at `/docs`. See
+[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for verified progress,
+[GOALS.md](GOALS.md) for the authoritative specification, and
+[docs/SCAR_BASELINE.md](docs/SCAR_BASELINE.md) for live scar evidence.
 
-The default database URL is `sqlite:///./vllm_portal.db`, resolved relative to
-the process working directory. This is development behavior only and is not a
-durable deployment configuration.
+## 🔒 Safety
 
-## Current API surface
+- ✅ Monitoring and benchmark operations are available.
+- ✅ The model cache and host configuration are mounted read-only.
+- ⚠️ Model activation and lifecycle mutations remain disabled.
+- ❌ Authentication is not implemented; restrict network access accordingly.
 
-- `GET /health` and `GET /api/v1/health`
-- `GET /api/v1/capabilities` for a refreshed read-only host/runtime snapshot
-- `POST /api/v1/runtime/sync` and `/runtime/snapshots` for observed state
-- `POST /api/v1/runtime/known-good` for health-gated known-good records
-- CRUD-like model and profile record endpoints under `/api/v1`
-- benchmark record endpoints and a bounded `/api/v1/benchmarks/run` smoke test
-- preliminary memory validation and storage endpoints
+## 📄 License
 
-Request validation is currently implemented for model/profile creation and
-updates and for the memory-validation endpoint. Other endpoints remain
-unvalidated prototypes and are tracked as such in the implementation status.
-
-## Testing
-
-```bash
-venv/bin/python -m pytest -q
-bats tests/deployment.bats
-```
-
-The suite exercises request schemas, API integration, profile referential
-checks, Linux/AMD/Docker/vLLM discovery parsers, read-only cache discovery,
-dashboard states, persistence, lifecycle action preview, and benchmarking.
-
-## Supported platforms
-
-Ubuntu 24.04/26.04, Fedora, and RHEL with AMD or NVIDIA GPUs are product
-targets. Ubuntu 24.04 with AMD SMI, Docker Compose, and the existing vLLM
-deployment has been non-destructively validated on `scar.lab`; this is not yet
-a general supported release.
-
-See [the scar baseline](docs/SCAR_BASELINE.md) for collected values,
-unavailable measurements, and lifecycle safety evidence.
-
-## License
-
-No license file has been added yet.
+No license has been selected yet.

@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="vLLm Management Portal",
-    description="Management portal for vLLM deployments",
+    title="vLLM Dashboard",
+    description="Operations dashboard for existing vLLM deployments",
     version="1.0.0",
 )
 

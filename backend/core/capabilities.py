@@ -1,5 +1,5 @@
 """
-vLLM Management Portal - Adapters and Capabilities Framework
+vLLM Dashboard - Adapters and Capabilities Framework
 """
 
 import platform

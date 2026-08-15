@@ -1,3 +1,3 @@
 """
-vLLM Management Portal - Utils Package
+vLLM Dashboard - Utils Package
 """
