@@ -16,7 +16,7 @@ def test_host_discovery_reads_linux_release(tmp_path: Path, monkeypatch) -> None
     release = tmp_path / "os-release"
     cpuinfo = tmp_path / "cpuinfo"
     release.write_text('ID="ubuntu"\nNAME="Ubuntu"\nVERSION_ID="24.04"\n')
-    cpuinfo.write_text("model name : Test CPU 9000\n")
+    cpuinfo.write_text("model name : Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz\n")
     monkeypatch.setenv("VLLM_HOSTNAME", "configured-host")
     monkeypatch.setenv("HOST_PRIMARY_IP", "192.0.2.10")
 
@@ -25,9 +25,17 @@ def test_host_discovery_reads_linux_release(tmp_path: Path, monkeypatch) -> None
     assert result["os_id"] == "ubuntu"
     assert result["os_version"] == "24.04"
     assert result["memory_total_bytes"] > 0
-    assert result["cpu_model"] == "Test CPU 9000"
+    assert result["cpu_model"] == "Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz"
+    assert result["cpu_model_short"] == "Intel Core i7-8086K"
     assert result["hostname"] == "configured-host"
     assert result["primary_ip"] == "192.0.2.10"
+
+
+def test_cpu_short_name_handles_amd_core_suffix() -> None:
+    assert (
+        HostDiscovery._short_cpu_model("AMD Ryzen 9 9950X 16-Core Processor")
+        == "AMD Ryzen 9 9950X"
+    )
 
 
 def test_docker_compose_discovery_and_safe_preview() -> None:

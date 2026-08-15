@@ -15,8 +15,9 @@ function render(snapshot) {
   activeModel = vllm.active_model || null;
   $("hostname").textContent = value(host.hostname);
   $("host-ip").textContent = value(host.primary_ip);
-  $("host-cpu").textContent = value(host.cpu_model);
+  $("host-cpu").textContent = value(host.cpu_model_short || host.cpu_model);
   $("host-ram").textContent = fmtGiB(host.memory_total_bytes);
+  $("host-gpu").textContent = value(gpu && gpu.model);
   $("host-os").textContent = `${value(host.os_name)} ${value(host.os_version)} · kernel ${value(host.kernel)}`;
   $("model").textContent = value(vllm.active_model);
   $("served").textContent = vllm.served_model_name ? `Served as ${vllm.served_model_name}` : "Served name unavailable";

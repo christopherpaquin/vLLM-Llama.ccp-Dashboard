@@ -12,6 +12,7 @@ def test_dashboard_is_served_at_root() -> None:
     assert "ACTIVE MODEL" in response.text
     assert "TOTAL RAM" in response.text
     assert 'id="host-ip"' in response.text
+    assert 'id="host-gpu"' in response.text
     assert "Run TTFT + token rate test" in response.text
 
 

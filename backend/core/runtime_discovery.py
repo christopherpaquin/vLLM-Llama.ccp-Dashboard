@@ -61,6 +61,7 @@ class HostDiscovery:
         release = self._read_os_release()
         memory = psutil.virtual_memory()
         root_storage = shutil.disk_usage("/")
+        cpu_model = self._cpu_model()
         return {
             "hostname": os.getenv("VLLM_HOSTNAME") or socket.gethostname(),
             "primary_ip": os.getenv("HOST_PRIMARY_IP") or "Unknown",
@@ -78,7 +79,8 @@ class HostDiscovery:
             ),
             "cpu_logical_count": psutil.cpu_count(logical=True),
             "cpu_physical_count": psutil.cpu_count(logical=False),
-            "cpu_model": self._cpu_model(),
+            "cpu_model": cpu_model,
+            "cpu_model_short": self._short_cpu_model(cpu_model),
             "memory_total_bytes": memory.total,
             "memory_available_bytes": memory.available,
             "root_storage_total_bytes": root_storage.total,
@@ -95,6 +97,15 @@ class HostDiscovery:
         except OSError:
             pass
         return platform.processor() or "Unknown"
+
+    @staticmethod
+    def _short_cpu_model(model: str) -> str:
+        """Remove vendor marks, core counts, and clock suffixes for display."""
+        shortened = model.replace("(R)", "").replace("(TM)", "")
+        shortened = re.sub(r"\s+\d+-Core Processor$", "", shortened)
+        shortened = re.sub(r"\s+CPU(?:\s+@\s+.*)?$", "", shortened)
+        shortened = re.sub(r"\s+Processor$", "", shortened)
+        return " ".join(shortened.split()) or "Unknown"
 
     def _read_os_release(self) -> dict[str, str]:
         try:

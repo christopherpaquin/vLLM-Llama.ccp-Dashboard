@@ -51,6 +51,11 @@ socket proxy, and the Hugging Face cache through a read-only mount. Lifecycle
 mutations remain disabled until configuration preservation and rollback are
 fully implemented.
 
+Host identity comes from `.env`; deployment detects the primary IPv4 source
+address with `ip route`. CPU and RAM come from read-only Linux `/proc` and
+`psutil` data. GPU identity and utilization come from AMD SMI, with ROCm SMI
+as the fallback provider.
+
 ## 🚀 Deploy
 
 Requirements are Ubuntu 24.04, Docker Engine with the Compose plugin, a local
