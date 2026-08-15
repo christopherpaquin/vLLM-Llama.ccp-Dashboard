@@ -31,10 +31,10 @@ stubs are not counted as complete.
 | Frontend | Partial | The Infrence Engine Dashboard is deployed on scar with host identity/hardware, active model/health, VRAM/GPU/KV summaries, provider-specific runtime details, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
 | Containerized deployment | Complete for scar baseline | One-click Docker Compose deployment uses pinned images, a non-root/read-only portal, least-privilege Docker socket proxy, persistent data, healthcheck, and `unless-stopped` boot restart. Live deployed on scar. |
 | Backup / uninstall | Complete for scar baseline | Tested scripts back up persistent data and uninstall containers while preserving data by default. Purge is restricted to the exact portal data path and never touches vLLM. |
-| Automated tests | Partial | 33 pytest and 9 BATS tests cover backend/dashboard behavior, provider-specific details, vLLM/llama.cpp parsing/configuration, inference-container selection, image pinning, container identity, restart policy, read-only cache/AMD identity mounting, AMD SMI, and shell safety. Broader browser/matrix/security coverage remains. |
+| Automated tests | Partial | 33 pytest and 11 BATS tests cover backend/dashboard behavior, provider-specific details, vLLM/llama.cpp parsing/configuration, inference-container selection, image pinning, container identity, restart policy, environment-driven host identity, portability, read-only cache/AMD identity mounting, AMD SMI, and shell safety. Broader browser/matrix/security coverage remains. |
 | CI and pre-commit | Partial | Local pre-commit syntax, secret detection, and exact image-pin gates exist; hosted CI remains missing. |
 | Documentation | Partial | README documents deployment, development, health, backup, and uninstall. Dedicated architecture, security, and benchmark guides remain missing. |
-| Live validation on `scar.lab` | Partial | Portal is running healthy on port 8088 with AMD SMI, Docker/llama.cpp discovery, durable storage, and boot restart. The existing healthy llama.cpp container remained unchanged; no lifecycle command was executed. |
+| Live validation on reference host | Partial | Portal is running healthy on port 8088 with AMD SMI, Docker/llama.cpp discovery, durable storage, and boot restart. The existing healthy llama.cpp container remained unchanged; no lifecycle command was executed. |
 
 ## Current milestone
 

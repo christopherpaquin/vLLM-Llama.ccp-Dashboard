@@ -2058,7 +2058,8 @@ Physical hardware is not required for every CI test.
 
 # 67. First Live Validation Host
 
-`scar.lab` is the first live development and validation host.
+The host configured by `INFERENCE_HOSTNAME` is the first live development and
+validation host.
 
 Current first-target characteristics include:
 
@@ -2069,9 +2070,11 @@ ROCm
 existing containerized vLLM deployment
 ```
 
-Scar-specific implementation details must remain behind adapters and must not become the general architecture.
+Host-specific implementation details must remain behind adapters and must not
+become the general architecture.
 
-Live testing on Scar must not break or replace its working vLLM/ROCm environment.
+Live testing must not break or replace the host's working inference/ROCm
+environment.
 
 ---
 

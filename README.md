@@ -70,14 +70,21 @@ newer cards retain their exact product names inside the dashboard container.
 Requirements are Ubuntu 24.04, Docker Engine with the Compose plugin, a local
 ROCm installation, and an existing vLLM or llama.cpp endpoint.
 
+Deploy this dashboard **on the same physical host** as the vLLM or llama.cpp
+server. Local deployment is required for reliable Docker lifecycle discovery,
+GPU process attribution, AMD telemetry, ROCm access, and read-only model-cache
+discovery. `INFERENCE_BASE_URL` still controls the API target, but pointing it
+at a remote server does not make host-level discovery remote-aware.
+
 ```bash
 ./scripts/deploy.sh
 ```
 
 The idempotent deploy command creates `.env` from `.env-template` when needed,
 builds the pinned image, starts the stack, and waits for application health.
-Open `http://scar.lab:8088/`. Both containers use `restart: unless-stopped`, so
-the portal returns automatically when the Docker service starts at boot.
+Open `http://<dashboard-host>:8088/`. Both containers use
+`restart: unless-stopped`, so the portal returns automatically when the Docker
+service starts at boot.
 
 The deployed containers are named `vllm-llama-cpp-dashboard` and
 `vllm-llama-cpp-dashboard-docker-proxy`.
@@ -90,7 +97,9 @@ running containers.
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `PORTAL_PORT` | `8088` | Dashboard port |
+| `PORTAL_CONTAINER_HOSTNAME` | `inference-dashboard` | Internal dashboard container hostname |
 | `PORTAL_DATA_DIR` | `/var/lib/vllm-management-portal` | Persistent SQLite data |
+| `HOST_ROUTE_PROBE_IP` | `1.1.1.1` | Routing target used locally to discover the host's primary source IP; no connection is made |
 | `INFERENCE_BACKEND` | `vllm` | `vllm` or `llama_cpp` |
 | `INFERENCE_BASE_URL` | `http://host.docker.internal:8000` | Inference server URL |
 | `INFERENCE_HOSTNAME` | `inference-host` | Host name displayed on the dashboard |
@@ -162,7 +171,8 @@ cd backend
 API documentation is available at `/docs`. See
 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for verified progress,
 [GOALS.md](GOALS.md) for the authoritative specification, and
-[docs/SCAR_BASELINE.md](docs/SCAR_BASELINE.md) for live scar evidence.
+[docs/REFERENCE_BASELINE.md](docs/REFERENCE_BASELINE.md) for anonymized live
+reference-host evidence.
 
 ## 🔒 Safety
 

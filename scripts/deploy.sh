@@ -18,7 +18,7 @@ load_environment
 
 require_command awk
 require_command ip
-HOST_PRIMARY_IP="$(ip -4 route get 1.1.1.1 | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}')"
+HOST_PRIMARY_IP="$(ip -4 route get "${HOST_ROUTE_PROBE_IP}" | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}')"
 [[ -n "${HOST_PRIMARY_IP}" ]] || HOST_PRIMARY_IP="Unknown"
 export HOST_PRIMARY_IP
 

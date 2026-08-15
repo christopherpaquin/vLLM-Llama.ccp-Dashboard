@@ -1,4 +1,4 @@
-# scar.lab Read-Only Baseline
+# Reference Host Read-Only Baseline
 
 Captured on 2026-08-14 through the portal's read-only discovery providers.
 Telemetry is instantaneous and will vary with workload. No container, image,
@@ -6,7 +6,7 @@ driver, ROCm component, model, or deployment configuration was changed.
 
 | Capability | Observed value | Source |
 | --- | --- | --- |
-| Host | `scar.lab` | Linux/socket discovery |
+| Host | Configured through `INFERENCE_HOSTNAME` | Linux/socket discovery |
 | OS | Ubuntu 24.04 | `/etc/os-release` |
 | Kernel | `7.0.0-28-generic` | Linux platform API |
 | Architecture | `x86_64` | Linux platform API |
@@ -21,7 +21,7 @@ driver, ROCm component, model, or deployment configuration was changed.
 | Container runtime | Docker 29.7.2 | Docker server API/CLI |
 | Lifecycle mechanism | Docker Compose | Container Compose labels |
 | Compose project | `containerized-vllm-amd-r9700` | Container label |
-| Compose file | `/home/cpaquin/Workspace/Gitrepos/Containerized-VLLM-AMD-R9700/compose.yaml` | Container label |
+| Compose file | `<compose-file-from-container-label>` | Container label; host-specific path omitted |
 | Compose service | `vllm` | Container label |
 | Container health | Healthy | Docker health state |
 | Image | `rocm/vllm:rocm7.14.0_rdna_ubuntu24.04_py3.14_pytorch_2.11.0_vllm_0.23.0` | Docker inspect |
@@ -63,10 +63,10 @@ The adapter detected Docker Compose from existing container labels. It is in
 monitoring/preview-only mode. The proposed actions are:
 
 ```text
-docker compose -f /home/cpaquin/Workspace/Gitrepos/Containerized-VLLM-AMD-R9700/compose.yaml up -d vllm
-docker compose -f /home/cpaquin/Workspace/Gitrepos/Containerized-VLLM-AMD-R9700/compose.yaml stop vllm
-docker compose -f /home/cpaquin/Workspace/Gitrepos/Containerized-VLLM-AMD-R9700/compose.yaml restart vllm
-docker compose -f /home/cpaquin/Workspace/Gitrepos/Containerized-VLLM-AMD-R9700/compose.yaml ps --format json vllm
+docker compose -f <compose-file-from-container-label> up -d vllm
+docker compose -f <compose-file-from-container-label> stop vllm
+docker compose -f <compose-file-from-container-label> restart vllm
+docker compose -f <compose-file-from-container-label> ps --format json vllm
 ```
 
 No lifecycle command was executed. Known-good records can be created only

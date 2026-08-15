@@ -20,6 +20,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 fi
 
 load_environment
+[[ -n "${HOST_ROUTE_PROBE_IP:-}" ]] || fail "HOST_ROUTE_PROBE_IP must not be empty"
 [[ "${PORTAL_DATA_DIR:-}" == /* ]] || fail "PORTAL_DATA_DIR must be an absolute path"
 [[ "${PORTAL_DATA_DIR}" != "/" ]] || fail "PORTAL_DATA_DIR cannot be /"
 [[ -d "${ROCM_PATH:-/nonexistent}" ]] || fail "Configured ROCm path does not exist: ${ROCM_PATH:-unset}"

@@ -7,7 +7,7 @@
 **Progress:** Corrected IMPLEMENTATION_STATUS.md and README, fixed the duplicate API version prefix, added typed validation and referential checks, and reached 10 passing tests. Next: validate remaining inputs/paths, then implement read-only discovery and accurate unavailable telemetry semantics.
 
 ## 2026-08-14 21:20
-**Task:** Prove backend discovery and baseline workflows against scar.lab
+**Task:** Prove backend discovery and baseline workflows against the reference host
 **Decision:** Use only read-only Linux, AMD SMI/ROCm SMI, Docker inspect/top/logs, and vLLM HTTP probes; normalize all VRAM to bytes; separate process-attributed, external-process, and unattributed memory; keep every lifecycle mutation fail-closed.
 **Why:** scar is a working Ubuntu/Docker vLLM host. Live validation exposed unit and PID-attribution issues that mocks alone did not reveal, and GOALS.md makes measurement accuracy and deployment preservation the top priorities.
 **Progress:** Implemented and live-tested host/AMD/Docker Compose/vLLM/KV discovery, requested-vs-observed persistence, health-gated known-good records, a bounded persisted endpoint benchmark, and preview-only lifecycle commands. Nineteen tests pass. No lifecycle or configuration mutation occurred; atomic preservation/restore remains the gate before safe switching.

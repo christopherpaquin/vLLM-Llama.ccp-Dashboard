@@ -28,7 +28,7 @@ services:
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12.13-slim-trixie}
     container_name: vllm-llama-cpp-dashboard
-    hostname: vllm-dashboard
+    hostname: ${PORTAL_CONTAINER_HOSTNAME:-inference-dashboard}
     restart: ${RESTART_POLICY:-unless-stopped}
     depends_on:
       docker-socket-proxy:

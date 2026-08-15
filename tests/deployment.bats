@@ -67,6 +67,22 @@ test "$SCRIPT_DIR" = /caller/scripts
   [ "${status}" -eq 0 ]
 }
 
+@test "host identity and route probe are configured through the environment" {
+  run grep -E '^PORTAL_CONTAINER_HOSTNAME=' "${PROJECT_ROOT}/.env-template"
+  [ "${status}" -eq 0 ]
+  run grep -F 'HOST_ROUTE_PROBE_IP=1.1.1.1' "${PROJECT_ROOT}/.env-template"
+  [ "${status}" -eq 0 ]
+  run grep -F "hostname: \${PORTAL_CONTAINER_HOSTNAME:-inference-dashboard}" "${PROJECT_ROOT}/compose.yaml"
+  [ "${status}" -eq 0 ]
+  run grep -F "route get \"\${HOST_ROUTE_PROBE_IP}\"" "${PROJECT_ROOT}/scripts/deploy.sh"
+  [ "${status}" -eq 0 ]
+}
+
+@test "tracked files contain no lab-specific host identity" {
+  run git -C "${PROJECT_ROOT}" grep -niE 'scar[.]lab|/home/cpaquin|10[.]1[.]10[.]' -- . ':!tests/deployment.bats'
+  [ "${status}" -eq 1 ]
+}
+
 @test "dashboard containers use the current product names" {
   run grep -F 'container_name: vllm-llama-cpp-dashboard' "${PROJECT_ROOT}/compose.yaml"
   [ "${status}" -eq 0 ]
