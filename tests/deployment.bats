@@ -66,3 +66,10 @@ test "$SCRIPT_DIR" = /caller/scripts
   run grep -F "INFERENCE_BACKEND: \${INFERENCE_BACKEND:-vllm}" "${PROJECT_ROOT}/compose.yaml"
   [ "${status}" -eq 0 ]
 }
+
+@test "dashboard containers use the current product names" {
+  run grep -F 'container_name: vllm-llama-cpp-dashboard' "${PROJECT_ROOT}/compose.yaml"
+  [ "${status}" -eq 0 ]
+  run grep -F 'container_name: vllm-llama-cpp-dashboard-docker-proxy' "${PROJECT_ROOT}/compose.yaml"
+  [ "${status}" -eq 0 ]
+}

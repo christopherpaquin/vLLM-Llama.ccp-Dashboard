@@ -2,7 +2,7 @@ name: vllm-management-portal
 services:
   docker-socket-proxy:
     image: ${DOCKER_SOCKET_PROXY_IMAGE:-tecnativa/docker-socket-proxy:v0.4.2}
-    container_name: vllm-management-docker-proxy
+    container_name: vllm-llama-cpp-dashboard-docker-proxy
     restart: ${RESTART_POLICY:-unless-stopped}
     environment:
       CONTAINERS: 1
@@ -27,7 +27,7 @@ services:
       dockerfile: Dockerfile
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12.13-slim-trixie}
-    container_name: vllm-management-portal
+    container_name: vllm-llama-cpp-dashboard
     hostname: vllm-dashboard
     restart: ${RESTART_POLICY:-unless-stopped}
     depends_on:

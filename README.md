@@ -78,6 +78,9 @@ builds the pinned image, starts the stack, and waits for application health.
 Open `http://scar.lab:8088/`. Both containers use `restart: unless-stopped`, so
 the portal returns automatically when the Docker service starts at boot.
 
+The deployed containers are named `vllm-llama-cpp-dashboard` and
+`vllm-llama-cpp-dashboard-docker-proxy`.
+
 ## ⚙️ Configuration
 
 Edit the ignored `.env` and rerun `./scripts/deploy.sh`. Do not hand-edit the
