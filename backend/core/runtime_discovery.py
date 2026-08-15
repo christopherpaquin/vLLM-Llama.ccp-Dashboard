@@ -175,6 +175,7 @@ class DockerVLLMDiscovery:
         candidates = [
             item
             for item in containers
+            if not self._is_dashboard_container(item)
             if any(
                 term
                 in (
@@ -232,12 +233,30 @@ class DockerVLLMDiscovery:
                 (
                     mount.get("Source")
                     for mount in mounts
-                    if mount.get("Destination")
-                    == environment.get("HF_HOME", "/root/.cache/huggingface")
+                    if self._is_model_cache_mount(mount, environment, self.backend)
                 ),
                 None,
             ),
+            "backend_version": labels.get("org.opencontainers.image.version"),
         }
+
+    @staticmethod
+    def _is_dashboard_container(item: dict[str, Any]) -> bool:
+        text = (
+            f"{item.get('Names', '')} {item.get('Image', '')} "
+            f"{item.get('Labels', '')}"
+        ).lower()
+        return "vllm-management-portal" in text or "dashboard-docker-proxy" in text
+
+    @staticmethod
+    def _is_model_cache_mount(
+        mount: dict[str, Any], environment: dict[str, str], backend: str
+    ) -> bool:
+        destination = str(mount.get("Destination", ""))
+        if backend == "llama_cpp":
+            model_path = environment.get("LLAMA_ARG_MODEL", "")
+            return bool(model_path) and destination == str(Path(model_path).parent)
+        return destination == environment.get("HF_HOME", "/root/.cache/huggingface")
 
     @staticmethod
     def _candidate_score(item: dict[str, Any], backend: str = "vllm") -> int:
@@ -248,10 +267,11 @@ class DockerVLLMDiscovery:
             score += 100
         if image.startswith("rocm/vllm") or image.startswith("vllm/vllm"):
             score += 50
-        if backend == "llama_cpp" and (
-            "llama-server" in name or "llama.cpp" in image or "llama-cpp" in image
-        ):
-            score += 100
+        if backend == "llama_cpp":
+            if name in {"llamacpp", "llama-cpp", "llama-server"}:
+                score += 150
+            if "llama-server" in name or "llama.cpp" in image or "llama-cpp" in image:
+                score += 100
         if "management" in name or "management" in image or "portal" in name:
             score -= 100
         return score
@@ -274,6 +294,15 @@ class DockerVLLMDiscovery:
             "ENABLE_PREFIX_CACHING",
             "CPU_OFFLOAD_GB",
             "SWAP_SPACE",
+            "LLAMA_ARG_MODEL",
+            "LLAMA_ARG_CTX_SIZE",
+            "LLAMA_ARG_N_GPU_LAYERS",
+            "LLAMA_ARG_BATCH",
+            "LLAMA_ARG_UBATCH",
+            "LLAMA_ARG_PARALLEL",
+            "LLAMA_ARG_THREADS",
+            "LLAMA_ARG_FLASH_ATTN",
+            "LLAMA_ARG_ENDPOINT_METRICS",
         }
         parsed = {}
         for item in items:
@@ -393,6 +422,9 @@ class LlamaCppEndpointDiscovery:
             "native_context_tokens": meta.get("n_ctx_train"),
             "model_parameters": meta.get("n_params"),
             "model_size_bytes": meta.get("size"),
+            "model_quantization": (props or {}).get("model_ftype") or meta.get("ftype"),
+            "maximum_concurrency": (props or {}).get("total_slots"),
+            "backend_version": (props or {}).get("build_info"),
             "kv_cache_utilization_percent": None,
             "prompt_tokens_per_second": VLLMEndpointDiscovery._metric(
                 metrics, "llamacpp:prompt_tokens_seconds"

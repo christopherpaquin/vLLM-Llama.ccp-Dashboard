@@ -112,6 +112,11 @@ The configured directory is mounted read-only. llama.cpp Prometheus metrics
 are optional and require `llama-server --metrics`; health, model identity,
 properties, and benchmarks still work when metrics are disabled.
 
+Runtime details are provider-specific. A llama.cpp deployment shows verified
+llama.cpp settings such as context, quantization, parallel slots, GPU layers,
+batching, build version, and its actual inference image; vLLM-only settings are
+not displayed as unavailable llama.cpp values.
+
 ## 🧪 Benchmark
 
 Select **Run TTFT + token rate test** on the dashboard. The portal sends one

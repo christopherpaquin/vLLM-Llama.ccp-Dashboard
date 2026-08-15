@@ -40,7 +40,43 @@ function render(snapshot) {
   $("headroom").textContent = fmtGiB(memory.headroom_bytes);
   const env = runtime.environment || {};
   const generation = vllm.generation_settings || {};
-  const fields = {"Inference engine":backendName,"Context window":vllm.configured_max_model_len,"Native context":vllm.native_context_tokens,"Temperature":generation.temperature,"Top K":generation.top_k,"Top P":generation.top_p,"Min P":generation.min_p,"Repeat penalty":generation.repeat_penalty,"GPU memory target":env.GPU_MEMORY_UTILIZATION,"Precision / dtype":env.DTYPE,"Quantization":env.QUANTIZATION,"Max sequences":env.MAX_NUM_SEQS,"Max batched tokens":env.MAX_NUM_BATCHED_TOKENS,"Prefix caching":env.ENABLE_PREFIX_CACHING,"KV cache allocation":fmtGiB(vllm.kv_cache_memory_gib == null ? null : vllm.kv_cache_memory_gib*1073741824),"KV cache dtype":env.KV_CACHE_DTYPE,"CPU offload":env.CPU_OFFLOAD_GB,"Swap space":env.SWAP_SPACE,"Extra vLLM args":env.EXTRA_VLLM_ARGS,"Backend version":vllm.vllm_version,"Container image":runtime.image,"Maximum concurrency":vllm.maximum_concurrency,"Prompt throughput":vllm.prompt_tokens_per_second == null ? null : `${vllm.prompt_tokens_per_second} tok/s`,"Output throughput":vllm.output_tokens_per_second == null ? null : `${vllm.output_tokens_per_second} tok/s`,"Model-weight VRAM":fmtGiB(vllm.model_weight_memory_gib == null ? null : vllm.model_weight_memory_gib*1073741824),"Runtime/backend memory":vllm.runtime_activation_memory_gib == null ? "Unavailable (not reported by backend)" : `${vllm.runtime_activation_memory_gib} GiB`,"External GPU memory":fmtGiB(memory.external_process_vram_bytes)};
+  const fields = {"Inference engine":backendName,"Context window":vllm.configured_max_model_len,"Native context":vllm.native_context_tokens};
+  const addField = (label, fieldValue) => { if (fieldValue !== null && fieldValue !== undefined && fieldValue !== "") fields[label] = fieldValue; };
+  if (backend.type === "llama_cpp") {
+    addField("Quantization", vllm.model_quantization);
+    addField("Parallel slots", vllm.maximum_concurrency);
+    addField("GPU layers", env.LLAMA_ARG_N_GPU_LAYERS);
+    addField("Batch size", env.LLAMA_ARG_BATCH);
+    addField("Microbatch size", env.LLAMA_ARG_UBATCH);
+    addField("Metrics endpoint", env.LLAMA_ARG_ENDPOINT_METRICS === "1" ? "Enabled" : env.LLAMA_ARG_ENDPOINT_METRICS);
+  } else {
+    addField("GPU memory target", env.GPU_MEMORY_UTILIZATION);
+    addField("Precision / dtype", env.DTYPE);
+    addField("Quantization", env.QUANTIZATION);
+    addField("Max sequences", env.MAX_NUM_SEQS);
+    addField("Max batched tokens", env.MAX_NUM_BATCHED_TOKENS);
+    addField("Prefix caching", env.ENABLE_PREFIX_CACHING);
+    addField("KV cache allocation", vllm.kv_cache_memory_gib == null ? null : `${vllm.kv_cache_memory_gib} GiB`);
+    addField("KV cache dtype", env.KV_CACHE_DTYPE);
+    addField("CPU offload", env.CPU_OFFLOAD_GB);
+    addField("Swap space", env.SWAP_SPACE);
+    addField("Extra vLLM args", env.EXTRA_VLLM_ARGS);
+    addField("Maximum concurrency", vllm.maximum_concurrency);
+    addField("Model-weight VRAM", vllm.model_weight_memory_gib == null ? null : `${vllm.model_weight_memory_gib} GiB`);
+    addField("Runtime/backend memory", vllm.runtime_activation_memory_gib == null ? null : `${vllm.runtime_activation_memory_gib} GiB`);
+  }
+  addField("Temperature", generation.temperature);
+  addField("Top K", generation.top_k);
+  addField("Top P", generation.top_p);
+  addField("Min P", generation.min_p);
+  addField("Repeat penalty", generation.repeat_penalty);
+  addField("Backend version", vllm.backend_version || vllm.vllm_version || runtime.backend_version);
+  addField("Container image", runtime.image);
+  addField("Prompt throughput", vllm.prompt_tokens_per_second == null ? null : `${vllm.prompt_tokens_per_second} tok/s`);
+  addField("Output throughput", vllm.output_tokens_per_second == null ? null : `${vllm.output_tokens_per_second} tok/s`);
+  if (backend.type === "llama_cpp") addField("Model file size", vllm.model_size_bytes == null ? null : fmtGiB(vllm.model_size_bytes));
+  addField("Inference GPU memory", memory.vllm_process_vram_bytes == null ? null : fmtGiB(memory.vllm_process_vram_bytes));
+  if (memory.external_process_vram_bytes > 0) addField("External GPU memory", fmtGiB(memory.external_process_vram_bytes));
   const tunables = $("tunables"); tunables.replaceChildren();
   Object.entries(fields).forEach(([key, itemValue]) => { const row=document.createElement("div"), term=document.createElement("dt"), description=document.createElement("dd"); term.textContent=key; description.textContent=value(itemValue); row.append(term,description); tunables.append(row); });
   $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;

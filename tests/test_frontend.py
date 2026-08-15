@@ -13,6 +13,7 @@ def test_dashboard_is_served_at_root() -> None:
     assert "vLLM DASHBOARD" not in response.text
     assert "Runtime overview" not in response.text
     assert "styles.css?v=2" in response.text
+    assert "app.js?v=3" in response.text
     assert "ACTIVE MODEL" in response.text
     assert "TOTAL RAM" in response.text
     assert 'id="host-ip"' in response.text
@@ -38,3 +39,13 @@ def test_dropdown_script_has_loading_empty_and_error_states() -> None:
     assert "Loading cached models" in page.text
     assert "No cached models found" in response.text
     assert "Cached models unavailable" in response.text
+
+
+def test_runtime_details_are_backend_specific() -> None:
+    response = TestClient(app).get("/assets/app.js")
+
+    assert response.status_code == 200
+    assert 'backend.type === "llama_cpp"' in response.text
+    assert 'addField("GPU layers", env.LLAMA_ARG_N_GPU_LAYERS)' in response.text
+    assert 'addField("Parallel slots", vllm.maximum_concurrency)' in response.text
+    assert 'addField("Extra vLLM args", env.EXTRA_VLLM_ARGS)' in response.text

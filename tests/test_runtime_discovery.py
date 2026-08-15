@@ -114,8 +114,12 @@ def test_docker_discovery_ignores_management_portal_name_collision() -> None:
 
 def test_docker_discovers_llama_cpp_container() -> None:
     containers = [
-        {"Names": "vllm-management-portal", "Image": "vllm-management-portal:0.1.0"},
-        {"Names": "llama-server", "Image": "ghcr.io/ggml-org/llama.cpp:server"},
+        {
+            "Names": "vllm-llama-cpp-dashboard-docker-proxy",
+            "Image": "tecnativa/docker-socket-proxy:v0.4.2",
+            "Labels": "com.docker.compose.project=vllm-management-portal",
+        },
+        {"Names": "llamacpp", "Image": "local-image-id"},
     ]
 
     def runner(command: list[str]) -> subprocess.CompletedProcess[str]:
@@ -128,16 +132,42 @@ def test_docker_discovers_llama_cpp_container() -> None:
                 command,
                 0,
                 json.dumps(
-                    [{"Config": {"Image": containers[1]["Image"]}, "State": {}}]
+                    [
+                        {
+                            "Config": {
+                                "Image": "ghcr.io/ggml-org/llama.cpp:server",
+                                "Env": [
+                                    "LLAMA_ARG_MODEL=/models/coder.gguf",
+                                    "LLAMA_ARG_N_GPU_LAYERS=99",
+                                    "LLAMA_ARG_UBATCH=1024",
+                                    "SECRET=hidden",
+                                ],
+                                "Labels": {
+                                    "org.opencontainers.image.version": "b10438"
+                                },
+                            },
+                            "State": {},
+                            "Mounts": [
+                                {"Source": "/srv/models", "Destination": "/models"}
+                            ],
+                        }
+                    ]
                 ),
                 "",
             )
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    assert (
-        DockerVLLMDiscovery(runner, "llama_cpp").discover()["container"]
-        == "llama-server"
-    )
+    result = DockerVLLMDiscovery(runner, "llama_cpp").discover()
+
+    assert result["container"] == "llamacpp"
+    assert result["image"] == "ghcr.io/ggml-org/llama.cpp:server"
+    assert result["backend_version"] == "b10438"
+    assert result["model_cache_location"] == "/srv/models"
+    assert result["environment"] == {
+        "LLAMA_ARG_MODEL": "/models/coder.gguf",
+        "LLAMA_ARG_N_GPU_LAYERS": "99",
+        "LLAMA_ARG_UBATCH": "1024",
+    }
 
 
 def test_llama_cpp_endpoint_discovery_uses_official_read_only_apis(monkeypatch) -> None:
@@ -160,7 +190,10 @@ def test_llama_cpp_endpoint_discovery_uses_official_read_only_apis(monkeypatch) 
                 "default_generation_settings": {
                     "n_ctx": 8192,
                     "params": {"temperature": 0.8, "top_k": 40},
-                }
+                },
+                "model_ftype": "Q4_K - Medium",
+                "total_slots": 4,
+                "build_info": "b10438-abcdef",
             },
         ),
     }
@@ -183,6 +216,9 @@ def test_llama_cpp_endpoint_discovery_uses_official_read_only_apis(monkeypatch) 
     assert result["active_model"] == "coder-q4.gguf"
     assert result["configured_max_model_len"] == 8192
     assert result["native_context_tokens"] == 32768
+    assert result["model_quantization"] == "Q4_K - Medium"
+    assert result["maximum_concurrency"] == 4
+    assert result["backend_version"] == "b10438-abcdef"
     assert result["prompt_tokens_per_second"] == 120
     assert result["output_tokens_per_second"] == 48
     assert result["generation_settings"]["temperature"] == 0.8
