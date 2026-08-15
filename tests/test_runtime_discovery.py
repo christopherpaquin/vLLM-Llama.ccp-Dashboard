@@ -30,7 +30,12 @@ def test_docker_compose_discovery_and_safe_preview() -> None:
             "Id": "abc",
             "Config": {
                 "Image": "rocm/vllm:1",
-                "Env": ["MODEL_ID=owner/model", "SECRET=hidden", "HF_HOME=/cache"],
+                "Env": [
+                    "MODEL_ID=owner/model",
+                    "DTYPE=float16",
+                    "SECRET=hidden",
+                    "HF_HOME=/cache",
+                ],
                 "Labels": {
                     "com.docker.compose.project.config_files": "/srv/vllm/compose.yaml",
                     "com.docker.compose.project": "vllm",
@@ -61,6 +66,7 @@ def test_docker_compose_discovery_and_safe_preview() -> None:
     assert result["host_pid"] == 42
     assert result["container_pids"] == [42, 84]
     assert "SECRET" not in result["environment"]
+    assert result["environment"]["DTYPE"] == "float16"
     assert preview["enabled"] is False
     assert preview["actions"]["restart"] == [
         "docker",

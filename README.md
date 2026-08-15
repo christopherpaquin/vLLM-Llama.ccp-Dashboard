@@ -27,6 +27,12 @@ interfaces, SQLAlchemy entities, and a versioned HTTP API. Read-only Linux,
 AMD SMI/ROCm SMI, Docker Compose, and vLLM endpoint discovery have been live
 validated on `scar.lab`.
 
+The root page is a concise operational dashboard showing the active model,
+vLLM health, GPU utilization, VRAM/KV usage, headroom, current tunables, and
+a measured interactive benchmark. Its model selector is populated from the
+read-only local Hugging Face cache. Activation remains deliberately disabled
+until safe rollback is implemented.
+
 ## Deployment
 
 The supported scar deployment requires Ubuntu 24.04, Docker Engine with the
@@ -40,7 +46,8 @@ No Python virtual environment is needed on the deployment host.
 That one command validates prerequisites, creates `.env` from the committed
 template when needed, builds the pinned portal image, starts the portal and its
 read-only Docker API proxy, and waits for health. Open the API documentation at
-`http://scar.lab:8088/docs` or query health at
+`http://scar.lab:8088/`, browse API documentation at
+`http://scar.lab:8088/docs`, or query health at
 `http://scar.lab:8088/api/v1/health`.
 
 Both containers use Docker's `unless-stopped` restart policy. Because Docker is
@@ -115,8 +122,8 @@ bats tests/deployment.bats
 ```
 
 The suite exercises request schemas, API integration, profile referential
-checks, Linux/AMD/Docker/vLLM discovery parsers, state persistence, lifecycle
-action preview, and basic benchmarking.
+checks, Linux/AMD/Docker/vLLM discovery parsers, read-only cache discovery,
+dashboard states, persistence, lifecycle action preview, and benchmarking.
 
 ## Supported platforms
 

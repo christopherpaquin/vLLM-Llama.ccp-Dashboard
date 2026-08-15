@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir --requirement /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
 COPY --chown=portal:portal backend/ /app/
+COPY --chown=portal:portal frontend/ /app/frontend/
 COPY --chown=portal:portal container/amd-smi /usr/local/bin/amd-smi
 
 RUN chmod 0755 /usr/local/bin/amd-smi \

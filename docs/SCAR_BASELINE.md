@@ -93,3 +93,21 @@ Output throughput: 2.694 tokens/second
 This validates the basic execution/persistence path, not the complete
 benchmarking requirements. The response reached the requested eight-token
 limit, and the test is not yet a representative interactive benchmark.
+
+## Dashboard and interactive benchmark validation
+
+On 2026-08-15 the containerized dashboard was live-validated at port 8088.
+Its read-only cache provider returned two complete local model repositories,
+including the active model. One bounded deterministic streaming test produced:
+
+```text
+Prompt tokens: 9
+Output tokens: 64
+TTFT: 0.779 seconds
+Output throughput: 47.79 tokens/second
+End-to-end latency: 2.118 seconds
+```
+
+These are one-run functional-validation values, not benchmark percentiles or
+performance claims. Model activation remained disabled and the existing vLLM
+container was not restarted or reconfigured.

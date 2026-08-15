@@ -216,6 +216,12 @@ class DockerVLLMDiscovery:
             "KV_CACHE_MEMORY_BYTES",
             "EXTRA_VLLM_ARGS",
             "HF_HOME",
+            "DTYPE",
+            "MAX_NUM_SEQS",
+            "MAX_NUM_BATCHED_TOKENS",
+            "ENABLE_PREFIX_CACHING",
+            "CPU_OFFLOAD_GB",
+            "SWAP_SPACE",
         }
         parsed = {}
         for item in items:

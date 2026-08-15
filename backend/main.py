@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from api.v1.endpoints import router as api_router
 from core.database import engine, Base
@@ -29,10 +33,15 @@ app.add_middleware(
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
 
+frontend_dir = Path(__file__).resolve().parent / "frontend"
+if not frontend_dir.is_dir():
+    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+app.mount("/assets", StaticFiles(directory=frontend_dir), name="assets")
+
 
 @app.get("/")
 async def root():
-    return {"message": "vLLM Management Portal API"}
+    return FileResponse(frontend_dir / "index.html")
 
 
 @app.get("/health")

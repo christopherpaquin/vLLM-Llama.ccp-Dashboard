@@ -39,6 +39,7 @@ services:
       HOST_OS_RELEASE_PATH: /host/etc/os-release
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000}
       ROCM_PATH: /opt/rocm-host
+      MODEL_CACHE_PATH: /host/model-cache
     devices:
       - /dev/kfd
       - /dev/dri
@@ -48,6 +49,7 @@ services:
     volumes:
       - ${PORTAL_DATA_DIR:-/var/lib/vllm-management-portal}:/data
       - ${ROCM_PATH:-/opt/rocm-7.2.2}:/opt/rocm-host:ro
+      - ${MODEL_CACHE_PATH:-/var/lib/vllm/huggingface/hub}:/host/model-cache:ro
       - /etc/os-release:/host/etc/os-release:ro
       - /usr/bin/docker:/usr/local/bin/docker:ro
     extra_hosts:

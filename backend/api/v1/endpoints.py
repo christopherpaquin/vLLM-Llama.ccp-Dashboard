@@ -32,7 +32,8 @@ from api.schemas import (
     BasicBenchmarkRequest,
     KnownGoodRequest,
 )
-from core.benchmarking import BasicBenchmarkRunner
+from core.benchmarking import BasicBenchmarkRunner, InteractiveBenchmarkRunner
+from core.model_cache import ModelCacheDiscovery
 from core.runtime_discovery import CapabilityDiscoveryService
 
 router = APIRouter(tags=["v1"])
@@ -63,6 +64,12 @@ async def health_check(db: Session = Depends(get_db)):
 async def capabilities():
     """Refresh and return a non-destructive live capability snapshot."""
     return CapabilityDiscoveryService().discover()
+
+
+@router.get("/models/cached", response_model=dict)
+async def cached_models():
+    """List models from the configured read-only Hugging Face cache mount."""
+    return ModelCacheDiscovery().discover()
 
 
 @router.post("/runtime/snapshots", response_model=dict)
@@ -558,6 +565,41 @@ async def run_basic_benchmark(
         e2e=result["e2e_seconds"],
         decode_tps=result["output_tokens_per_second"],
         raw_data=json.dumps(result["raw_response"], sort_keys=True),
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {"id": record.id, **result}
+
+
+@router.post("/benchmarks/interactive", response_model=dict)
+async def run_interactive_benchmark(
+    request: BasicBenchmarkRequest, db: Session = Depends(get_db)
+):
+    model = db.get(Model, request.model_id)
+    profile = db.get(Profile, request.profile_id)
+    if not model or not profile or profile.model_id != model.id:
+        raise HTTPException(status_code=404, detail="Matching model/profile not found")
+    result = InteractiveBenchmarkRunner().run(
+        model.last_profile or model.friendly_name,
+        max_tokens=request.max_tokens,
+        seed=request.seed,
+    )
+    record = Benchmark(
+        model_id=model.id,
+        profile_id=profile.id,
+        prompt_tokens=result["prompt_tokens"],
+        output_tokens=result["output_tokens"],
+        concurrency=1,
+        requests=1,
+        warmup_requests=0,
+        random_seed=request.seed,
+        benchmark_type="interactive_streaming",
+        benchmark_tool="vLLM streaming completions API",
+        ttft_p50=result["ttft_seconds"],
+        e2e=result["e2e_seconds"],
+        decode_tps=result["output_tokens_per_second"],
+        raw_data=json.dumps(result["raw_events"], sort_keys=True),
     )
     db.add(record)
     db.commit()

@@ -27,9 +27,11 @@ assert config["services"]["docker-socket-proxy"]["restart"] == "unless-stopped"
   [ "${status}" -eq 0 ]
 }
 
-@test "portal does not join or alter the existing vLLM compose project" {
-  run grep -E 'containerized-vllm-amd-r9700|/var/lib/vllm/huggingface' "${PROJECT_ROOT}/compose.yaml"
+@test "portal stays isolated and mounts the model cache read-only" {
+  run grep -F 'containerized-vllm-amd-r9700' "${PROJECT_ROOT}/compose.yaml"
   [ "${status}" -eq 1 ]
+  run grep -F ':/host/model-cache:ro' "${PROJECT_ROOT}/compose.yaml"
+  [ "${status}" -eq 0 ]
 }
 
 @test "shell deployment scripts parse successfully" {
