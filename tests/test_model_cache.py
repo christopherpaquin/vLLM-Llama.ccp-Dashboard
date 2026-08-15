@@ -22,3 +22,17 @@ def test_model_cache_explains_unavailable_mount(tmp_path: Path) -> None:
     assert result["available"] is False
     assert result["models"] == []
     assert "not mounted" in result["reason"]
+
+
+def test_llama_cpp_cache_lists_gguf_files(tmp_path: Path) -> None:
+    model = tmp_path / "models" / "coder-q4.gguf"
+    model.parent.mkdir()
+    model.write_bytes(b"GGUF")
+    (model.parent / "notes.txt").write_text("ignored")
+
+    result = ModelCacheDiscovery(tmp_path, backend="llama_cpp").discover()
+
+    assert result["backend"] == "llama_cpp"
+    assert result["models"] == [
+        {"repository": "models/coder-q4.gguf", "format": "GGUF", "size_bytes": 4}
+    ]

@@ -14,11 +14,11 @@
     <main>
       <section class="host panel">
         <div class="host-identity"><span class="label">HOST</span><h2 id="hostname">Loading…</h2><strong id="host-ip">—</strong><p id="host-os" class="muted">Reading host details…</p></div>
-        <div class="host-facts"><div><span>PROCESSOR</span><strong id="host-cpu">—</strong></div><div><span>TOTAL RAM</span><strong id="host-ram">—</strong></div><div><span>GPU</span><strong id="host-gpu">—</strong></div></div>
+        <div class="host-facts"><div><span>PROCESSOR</span><strong id="host-cpu">—</strong></div><div><span>TOTAL RAM</span><strong id="host-ram">—</strong></div><div><span>GPU</span><strong id="host-gpu">—</strong></div><div><span>INFERENCE ENGINE</span><strong id="host-engine">—</strong></div></div>
       </section>
       <section class="hero panel">
         <div><span class="label">ACTIVE MODEL</span><h2 id="model">Loading…</h2><p id="served" class="muted"></p></div>
-        <div class="health"><span id="health-dot" class="dot waiting"></span><div><strong id="health">Checking</strong><small id="health-detail">vLLM API and metrics</small></div></div>
+        <div class="health"><span id="health-dot" class="dot waiting"></span><div><strong id="health">Checking</strong><small id="health-detail">Inference API and metrics</small></div></div>
       </section>
 
       <section class="metrics">
@@ -47,7 +47,7 @@
       </section>
 
       <details class="panel">
-        <summary><span><span class="label">RUNTIME DETAILS</span><strong>vLLM configuration and telemetry</strong></span><span>Expand</span></summary>
+        <summary><span><span class="label">RUNTIME DETAILS</span><strong>Inference configuration and telemetry</strong></span><span>Expand</span></summary>
         <dl id="tunables"></dl>
       </details>
       <p id="page-error" role="alert"></p>

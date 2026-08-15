@@ -57,3 +57,12 @@ test "$SCRIPT_DIR" = /caller/scripts
   run grep -F 'libdrm-amdgpu1' "${PROJECT_ROOT}/Dockerfile"
   [ "${status}" -eq 0 ]
 }
+
+@test "inference backend and target are configured through the environment" {
+  run grep -F 'INFERENCE_BACKEND=vllm' "${PROJECT_ROOT}/.env-template"
+  [ "${status}" -eq 0 ]
+  run grep -F 'INFERENCE_BASE_URL=http://host.docker.internal:8000' "${PROJECT_ROOT}/.env-template"
+  [ "${status}" -eq 0 ]
+  run grep -F "INFERENCE_BACKEND: \${INFERENCE_BACKEND:-vllm}" "${PROJECT_ROOT}/compose.yaml"
+  [ "${status}" -eq 0 ]
+}

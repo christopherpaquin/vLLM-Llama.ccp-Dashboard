@@ -7,7 +7,8 @@
 ![Tested with AMD ROCm](https://img.shields.io/badge/Tested-AMD%20ROCm-ED1C24?logo=amd&logoColor=white)
 
 A compact operations dashboard for observing, tuning, and benchmarking an
-existing vLLM deployment. It is an infrastructure interface, not a chat UI.
+existing vLLM or llama.cpp deployment. It is an infrastructure interface, not
+a chat UI.
 
 ## 🎯 What it shows
 
@@ -18,12 +19,13 @@ The landing page puts the current runtime first:
 | Host | Hostname, primary IP, OS/kernel, CPU model, total RAM | ✅ Live |
 | Model | Active repository, served name, API and metrics health | ✅ Live |
 | GPU | Utilization, VRAM, temperature, power, headroom | ✅ Live on AMD SMI |
-| KV cache | Utilization, allocation, token capacity, concurrency | ✅ Where vLLM reports it |
-| Models | Complete repositories in the read-only Hugging Face cache | ✅ Live |
+| Engine | Configured vLLM or llama.cpp provider | ✅ Visible in the host tile |
+| KV cache | Utilization, allocation, token capacity, concurrency | ✅ Where the backend reports it |
+| Models | Hugging Face snapshots or local GGUF files | ✅ Read-only discovery |
 | Benchmark | TTFT, output tokens/second, end-to-end latency | ✅ Bounded streaming test |
 | Switching | Activate a different cached model | ⚠️ Safety-locked |
 
-Advanced vLLM configuration and memory detail stays collapsed until needed.
+Advanced inference configuration and memory detail stays collapsed until needed.
 Unavailable values are labeled explicitly rather than estimated.
 
 ## 🧭 How it works
@@ -40,16 +42,22 @@ Unavailable values are labeled explicitly rather than estimated.
        │           │
        │           └──────────────┐
 ┌──────▼────────┐  ┌──────────────▼─────────────┐
-│ AMD SMI/ROCm  │  │ vLLM API, metrics, Docker │
+│ AMD SMI/ROCm  │  │ Inference API and Docker  │
 │ host telemetry│  │ and read-only model cache │
 └───────────────┘  └────────────────────────────┘
 ```
 
-The portal runs separately from vLLM. It reads GPU devices, the configured
-ROCm installation, vLLM endpoints, Docker metadata through a restricted
-socket proxy, and the Hugging Face cache through a read-only mount. Lifecycle
-mutations remain disabled until configuration preservation and rollback are
-fully implemented.
+The dashboard runs separately from the inference server. It reads GPU devices,
+the configured ROCm installation, backend endpoints, Docker metadata through a
+restricted socket proxy, and the configured model directory through a
+read-only mount. Lifecycle mutations remain disabled until configuration
+preservation and rollback are fully implemented.
+
+vLLM uses `/health`, `/v1/models`, `/metrics`, and its startup telemetry.
+llama.cpp uses its official `/health`, `/v1/models`, `/props`, and optional
+`/metrics` endpoints. Both use the OpenAI-compatible `/v1/completions` API for
+the quick benchmark. See the
+[official llama-server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 
 Host identity comes from `.env`; deployment detects the primary IPv4 source
 address with `ip route`. CPU and RAM come from read-only Linux `/proc` and
@@ -59,7 +67,7 @@ as the fallback provider.
 ## 🚀 Deploy
 
 Requirements are Ubuntu 24.04, Docker Engine with the Compose plugin, a local
-ROCm installation, and an existing vLLM endpoint.
+ROCm installation, and an existing vLLM or llama.cpp endpoint.
 
 ```bash
 ./scripts/deploy.sh
@@ -79,11 +87,25 @@ running containers.
 | --- | --- | --- |
 | `PORTAL_PORT` | `8088` | Dashboard port |
 | `PORTAL_DATA_DIR` | `/var/lib/vllm-management-portal` | Persistent SQLite data |
-| `VLLM_BASE_URL` | `http://host.docker.internal:8000` | Existing vLLM API |
-| `VLLM_HOSTNAME` | `vllm-host` | Host name displayed on the dashboard |
+| `INFERENCE_BACKEND` | `vllm` | `vllm` or `llama_cpp` |
+| `INFERENCE_BASE_URL` | `http://host.docker.internal:8000` | Inference server URL |
+| `INFERENCE_HOSTNAME` | `inference-host` | Host name displayed on the dashboard |
 | `ROCM_PATH` | `/opt/rocm-7.2.2` | Host ROCm installation |
-| `MODEL_CACHE_PATH` | `/var/lib/vllm/huggingface/hub` | Read-only model cache |
+| `MODEL_CACHE_PATH` | `/var/lib/vllm/huggingface/hub` | HF cache or llama.cpp GGUF directory |
 | `RESTART_POLICY` | `unless-stopped` | Docker restart behavior |
+
+For a llama.cpp server, set the following in `.env`, then redeploy:
+
+```dotenv
+INFERENCE_BACKEND=llama_cpp
+INFERENCE_HOSTNAME=llama.example.net
+INFERENCE_BASE_URL=http://host.docker.internal:8080
+MODEL_CACHE_PATH=/srv/llama-models
+```
+
+The configured directory is mounted read-only. llama.cpp Prometheus metrics
+are optional and require `llama-server --metrics`; health, model identity,
+properties, and benchmarks still work when metrics are disabled.
 
 ## 🧪 Benchmark
 
@@ -107,9 +129,9 @@ load benchmark.
 ./scripts/uninstall.sh
 ```
 
-`uninstall.sh` preserves portal data. `uninstall.sh --purge-data` removes only
-the validated portal data path. Neither operation changes the existing vLLM
-deployment, image, configuration, or cached models.
+`uninstall.sh` preserves dashboard data. `uninstall.sh --purge-data` removes
+only the validated dashboard data path. Neither operation changes the existing
+inference deployment, image, configuration, or cached models.
 
 ## 🧑‍💻 Development and tests
 

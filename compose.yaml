@@ -37,9 +37,10 @@ services:
       DATABASE_URL: sqlite:////data/vllm_portal.db
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       HOST_OS_RELEASE_PATH: /host/etc/os-release
-      VLLM_HOSTNAME: ${VLLM_HOSTNAME:-vllm-host}
+      INFERENCE_BACKEND: ${INFERENCE_BACKEND:-vllm}
+      INFERENCE_HOSTNAME: ${INFERENCE_HOSTNAME:-inference-host}
       HOST_PRIMARY_IP: ${HOST_PRIMARY_IP:-Unknown}
-      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000}
+      INFERENCE_BASE_URL: ${INFERENCE_BASE_URL:-http://host.docker.internal:8000}
       ROCM_PATH: /opt/rocm-host
       MODEL_CACHE_PATH: /host/model-cache
     devices:

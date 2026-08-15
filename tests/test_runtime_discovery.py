@@ -7,6 +7,7 @@ from pathlib import Path
 from core.runtime_discovery import (
     DockerVLLMDiscovery,
     HostDiscovery,
+    LlamaCppEndpointDiscovery,
     VLLMEndpointDiscovery,
     VLLMLogTelemetryParser,
 )
@@ -109,6 +110,83 @@ def test_docker_discovery_ignores_management_portal_name_collision() -> None:
         return subprocess.CompletedProcess(command, 0, "", "")
 
     assert DockerVLLMDiscovery(runner).discover()["container"] == "vllm"
+
+
+def test_docker_discovers_llama_cpp_container() -> None:
+    containers = [
+        {"Names": "vllm-management-portal", "Image": "vllm-management-portal:0.1.0"},
+        {"Names": "llama-server", "Image": "ghcr.io/ggml-org/llama.cpp:server"},
+    ]
+
+    def runner(command: list[str]) -> subprocess.CompletedProcess[str]:
+        if command[:2] == ["docker", "ps"]:
+            return subprocess.CompletedProcess(
+                command, 0, "\n".join(json.dumps(item) for item in containers), ""
+            )
+        if command[:2] == ["docker", "inspect"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                json.dumps(
+                    [{"Config": {"Image": containers[1]["Image"]}, "State": {}}]
+                ),
+                "",
+            )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    assert (
+        DockerVLLMDiscovery(runner, "llama_cpp").discover()["container"]
+        == "llama-server"
+    )
+
+
+def test_llama_cpp_endpoint_discovery_uses_official_read_only_apis(monkeypatch) -> None:
+    responses = {
+        "/health": (True, {"status": "ok"}),
+        "/v1/models": (
+            True,
+            {
+                "data": [
+                    {
+                        "id": "coder-q4.gguf",
+                        "meta": {"n_ctx_train": 32768, "n_params": 7, "size": 4},
+                    }
+                ]
+            },
+        ),
+        "/props": (
+            True,
+            {
+                "default_generation_settings": {
+                    "n_ctx": 8192,
+                    "params": {"temperature": 0.8, "top_k": 40},
+                }
+            },
+        ),
+    }
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_json",
+        lambda url: responses[next(path for path in responses if url.endswith(path))],
+    )
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_text",
+        lambda url: (
+            True,
+            "llamacpp:prompt_tokens_seconds 120\nllamacpp:predicted_tokens_seconds 48\n",
+        ),
+    )
+
+    result = LlamaCppEndpointDiscovery("http://llama:8080").discover()
+
+    assert result["api_healthy"] is True
+    assert result["backend_name"] == "llama.cpp"
+    assert result["active_model"] == "coder-q4.gguf"
+    assert result["configured_max_model_len"] == 8192
+    assert result["native_context_tokens"] == 32768
+    assert result["prompt_tokens_per_second"] == 120
+    assert result["output_tokens_per_second"] == 48
+    assert result["generation_settings"]["temperature"] == 0.8
+    assert result["kv_cache_utilization_percent"] is None
 
 
 def test_metrics_and_startup_logs_are_parsed_without_estimates() -> None:

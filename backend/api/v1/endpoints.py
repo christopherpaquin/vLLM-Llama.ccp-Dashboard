@@ -49,12 +49,16 @@ async def health_check(db: Session = Depends(get_db)):
     except Exception:
         database_healthy = False
     snapshot = CapabilityDiscoveryService().discover()
+    inference = snapshot.get("inference", snapshot["vllm"])
     return {
         "status": "healthy" if database_healthy else "degraded",
         "manager_healthy": True,
         "database_healthy": database_healthy,
-        "vllm_api_healthy": snapshot["vllm"]["api_healthy"],
-        "vllm_metrics_healthy": snapshot["vllm"]["metrics_healthy"],
+        "backend": snapshot.get("backend", {}).get("name", "vLLM"),
+        "backend_api_healthy": inference["api_healthy"],
+        "backend_metrics_healthy": inference["metrics_healthy"],
+        "vllm_api_healthy": inference["api_healthy"],
+        "vllm_metrics_healthy": inference["metrics_healthy"],
         "gpu_telemetry_available": bool(snapshot["gpus"]),
         "lifecycle_control": "monitoring only",
     }
@@ -99,8 +103,9 @@ async def capture_runtime_snapshot(db: Session = Depends(get_db)):
 async def sync_discovered_runtime(db: Session = Depends(get_db)):
     """Persist the reliably observed active model and requested profile."""
     snapshot = CapabilityDiscoveryService().discover()
-    active_model = snapshot["vllm"].get("active_model")
-    if not active_model or "/" not in active_model:
+    inference = snapshot.get("inference", snapshot["vllm"])
+    active_model = inference.get("active_model")
+    if not active_model:
         raise HTTPException(
             status_code=503, detail="Active model repository is unavailable"
         )
@@ -108,10 +113,12 @@ async def sync_discovered_runtime(db: Session = Depends(get_db)):
     if not model:
         model = Model(
             huggingface_repo=active_model,
-            friendly_name=snapshot["vllm"].get("served_model_name") or active_model,
+            friendly_name=inference.get("served_model_name") or active_model,
             installed=True,
-            max_context_length=snapshot["vllm"].get("configured_max_model_len"),
-            current_context_length=snapshot["vllm"].get("effective_max_model_len"),
+            max_context_length=inference.get("native_context_tokens")
+            or inference.get("configured_max_model_len"),
+            current_context_length=inference.get("effective_max_model_len")
+            or inference.get("configured_max_model_len"),
             compatibility_state="Unknown",
         )
         db.add(model)
@@ -129,13 +136,15 @@ async def sync_discovered_runtime(db: Session = Depends(get_db)):
             name=profile_name,
             max_model_len=int(
                 environment.get("MAX_MODEL_LEN")
-                or snapshot["vllm"]["configured_max_model_len"]
+                or inference.get("configured_max_model_len")
+                or 1
             ),
             gpu_memory_utilization=float(
                 environment.get("GPU_MEMORY_UTILIZATION") or 0.85
             ),
-            effective_max_model_len=snapshot["vllm"].get("effective_max_model_len"),
-            memory_profile_raw=json.dumps(snapshot["vllm"], sort_keys=True),
+            effective_max_model_len=inference.get("effective_max_model_len")
+            or inference.get("configured_max_model_len"),
+            memory_profile_raw=json.dumps(inference, sort_keys=True),
         )
         db.add(profile)
     db.commit()
@@ -155,7 +164,10 @@ async def promote_known_good(request: KnownGoodRequest, db: Session = Depends(ge
     observed = json.loads(snapshot.observed_json)
     health_validated = bool(
         observed.get("vllm", {}).get("api_healthy")
-        and observed.get("vllm", {}).get("metrics_healthy")
+        and (
+            observed.get("vllm", {}).get("metrics_healthy")
+            or observed.get("vllm", {}).get("metrics_optional")
+        )
         and observed.get("runtime", {}).get("container_health") == "healthy"
     )
     if not health_validated:

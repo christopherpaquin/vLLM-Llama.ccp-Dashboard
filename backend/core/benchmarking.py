@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 import urllib.request
 from collections.abc import Callable
 from typing import Any
+
+from .inference_config import inference_base_url
 
 
 RequestSender = Callable[[urllib.request.Request, float], dict[str, Any]]
@@ -33,9 +34,7 @@ class BasicBenchmarkRunner:
         sender: RequestSender = send_json,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
-        self.base_url = (
-            base_url or os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000")
-        ).rstrip("/")
+        self.base_url = (base_url or inference_base_url()).rstrip("/")
         self.sender = sender
         self.clock = clock
 
@@ -110,9 +109,7 @@ class InteractiveBenchmarkRunner:
         sender: StreamSender = send_stream,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
-        self.base_url = (
-            base_url or os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000")
-        ).rstrip("/")
+        self.base_url = (base_url or inference_base_url()).rstrip("/")
         self.sender = sender
         self.clock = clock
 

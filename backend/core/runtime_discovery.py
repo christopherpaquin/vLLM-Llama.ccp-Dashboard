@@ -18,6 +18,12 @@ from typing import Any
 import psutil
 
 from .gpu_telemetry import AMDGPUProvider, GenericGPUProvider, NVGPUProvider
+from .inference_config import (
+    backend_display_name,
+    inference_backend,
+    inference_base_url,
+    inference_hostname,
+)
 
 
 CommandRunner = Callable[[list[str]], subprocess.CompletedProcess[str]]
@@ -63,7 +69,7 @@ class HostDiscovery:
         root_storage = shutil.disk_usage("/")
         cpu_model = self._cpu_model()
         return {
-            "hostname": os.getenv("VLLM_HOSTNAME") or socket.gethostname(),
+            "hostname": inference_hostname() or socket.gethostname(),
             "primary_ip": os.getenv("HOST_PRIMARY_IP") or "Unknown",
             "os_id": release.get("ID", "unknown"),
             "os_name": release.get("NAME", "Unknown"),
@@ -141,10 +147,13 @@ class HostDiscovery:
 
 
 class DockerVLLMDiscovery:
-    """Discover a Compose-managed vLLM container without changing it."""
+    """Discover a Compose-managed inference container without changing it."""
 
-    def __init__(self, runner: CommandRunner = run_read_only) -> None:
+    def __init__(
+        self, runner: CommandRunner = run_read_only, backend: str = "vllm"
+    ) -> None:
         self._run = runner
+        self.backend = backend
 
     def discover(self) -> dict[str, Any]:
         try:
@@ -158,15 +167,29 @@ class DockerVLLMDiscovery:
                 "lifecycle_mechanism": "Unknown",
                 "container": None,
             }
+        terms = (
+            ("llama.cpp", "llama-cpp", "llamacpp", "llama-server")
+            if self.backend == "llama_cpp"
+            else ("vllm",)
+        )
         candidates = [
             item
             for item in containers
-            if "vllm" in str(item.get("Names", "")).lower()
-            or "vllm" in str(item.get("Image", "")).lower()
+            if any(
+                term
+                in (
+                    str(item.get("Names", "")) + " " + str(item.get("Image", ""))
+                ).lower()
+                for term in terms
+            )
         ]
         # Prefer the inference server over this management portal. Both names
         # intentionally contain "vllm", so first-match discovery is unsafe.
-        candidate = max(candidates, key=self._candidate_score, default=None)
+        candidate = max(
+            candidates,
+            key=lambda item: self._candidate_score(item, self.backend),
+            default=None,
+        )
         if not candidate:
             return {
                 "runtime": "docker",
@@ -217,7 +240,7 @@ class DockerVLLMDiscovery:
         }
 
     @staticmethod
-    def _candidate_score(item: dict[str, Any]) -> int:
+    def _candidate_score(item: dict[str, Any], backend: str = "vllm") -> int:
         name = str(item.get("Names", "")).lower()
         image = str(item.get("Image", "")).lower()
         score = 0
@@ -225,6 +248,10 @@ class DockerVLLMDiscovery:
             score += 100
         if image.startswith("rocm/vllm") or image.startswith("vllm/vllm"):
             score += 50
+        if backend == "llama_cpp" and (
+            "llama-server" in name or "llama.cpp" in image or "llama-cpp" in image
+        ):
+            score += 100
         if "management" in name or "management" in image or "portal" in name:
             score -= 100
         return score
@@ -316,6 +343,8 @@ class VLLMEndpointDiscovery:
         metrics_ok, metrics = read_text(f"{self.base_url}/metrics")
         first_model = ((models or {}).get("data") or [{}])[0] if models_ok else {}
         return {
+            "backend_type": "vllm",
+            "backend_name": "vLLM",
             "api_healthy": health_ok and models_ok,
             "metrics_healthy": metrics_ok,
             "active_model": first_model.get("root") or first_model.get("id"),
@@ -335,6 +364,56 @@ class VLLMEndpointDiscovery:
         )
         match = pattern.search(text)
         return float(match.group(1)) * multiplier if match else None
+
+
+class LlamaCppEndpointDiscovery:
+    """Read llama.cpp's public health, model, properties, and metrics APIs."""
+
+    def __init__(self, base_url: str = "http://127.0.0.1:8080") -> None:
+        self.base_url = base_url.rstrip("/")
+
+    def discover(self) -> dict[str, Any]:
+        health_ok, _ = read_json(f"{self.base_url}/health")
+        models_ok, models = read_json(f"{self.base_url}/v1/models")
+        props_ok, props = read_json(f"{self.base_url}/props")
+        metrics_ok, metrics = read_text(f"{self.base_url}/metrics")
+        first_model = ((models or {}).get("data") or [{}])[0] if models_ok else {}
+        meta = first_model.get("meta") or {}
+        settings = (props or {}).get("default_generation_settings") or {}
+        params = settings.get("params") or {}
+        return {
+            "backend_type": "llama_cpp",
+            "backend_name": "llama.cpp",
+            "api_healthy": health_ok and models_ok,
+            "metrics_healthy": metrics_ok,
+            "metrics_optional": True,
+            "active_model": first_model.get("id"),
+            "served_model_name": first_model.get("id"),
+            "configured_max_model_len": settings.get("n_ctx"),
+            "native_context_tokens": meta.get("n_ctx_train"),
+            "model_parameters": meta.get("n_params"),
+            "model_size_bytes": meta.get("size"),
+            "kv_cache_utilization_percent": None,
+            "prompt_tokens_per_second": VLLMEndpointDiscovery._metric(
+                metrics, "llamacpp:prompt_tokens_seconds"
+            ),
+            "output_tokens_per_second": VLLMEndpointDiscovery._metric(
+                metrics, "llamacpp:predicted_tokens_seconds"
+            ),
+            "properties_healthy": props_ok,
+            "generation_settings": {
+                key: params.get(key)
+                for key in (
+                    "temperature",
+                    "top_k",
+                    "top_p",
+                    "min_p",
+                    "repeat_penalty",
+                    "seed",
+                )
+                if key in params
+            },
+        }
 
 
 class VLLMLogTelemetryParser:
@@ -376,12 +455,16 @@ class CapabilityDiscoveryService:
         self.runner = runner
 
     def discover(self) -> dict[str, Any]:
-        docker = DockerVLLMDiscovery(self.runner).discover()
+        backend = inference_backend()
+        docker = DockerVLLMDiscovery(self.runner, backend).discover()
         gpu_provider = self._gpu_provider()
         gpus = [gpu.to_dict() for gpu in gpu_provider.get_gpu_devices()]
-        endpoint = VLLMEndpointDiscovery(
-            os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000")
-        ).discover()
+        endpoint_provider = (
+            LlamaCppEndpointDiscovery(inference_base_url())
+            if backend == "llama_cpp"
+            else VLLMEndpointDiscovery(inference_base_url())
+        )
+        endpoint = endpoint_provider.discover()
         logs = ""
         if docker.get("container"):
             try:
@@ -391,7 +474,15 @@ class CapabilityDiscoveryService:
                 logs = completed.stdout + completed.stderr
             except (OSError, subprocess.SubprocessError):
                 pass
-        log_telemetry = VLLMLogTelemetryParser.parse(logs)
+        log_telemetry = (
+            VLLMLogTelemetryParser.parse(logs)
+            if backend == "vllm"
+            else {
+                "memory_source": "Unavailable",
+                "runtime_activation_memory_gib": None,
+                "backend_non_torch_memory_gib": None,
+            }
+        )
         processes = [process for gpu in gpus for process in gpu.get("processes", [])]
         vllm_pids = set(docker.get("container_pids") or [])
         vllm_process_vram = sum(
@@ -407,10 +498,16 @@ class CapabilityDiscoveryService:
         attributed_process_vram = vllm_process_vram + external_process_vram
         total_used = sum(gpu.get("vram_used") or 0 for gpu in gpus)
         return {
+            "backend": {
+                "type": backend,
+                "name": backend_display_name(backend),
+                "base_url": inference_base_url(),
+            },
             "host": HostDiscovery().discover(),
             "gpus": gpus,
             "runtime": docker,
             "vllm": {**endpoint, **log_telemetry},
+            "inference": {**endpoint, **log_telemetry},
             "memory": {
                 "vllm_process_vram_bytes": vllm_process_vram or None,
                 "external_process_vram_bytes": external_process_vram,

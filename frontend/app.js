@@ -11,20 +11,23 @@ async function request(url, options = {}, timeout = 10000) {
 }
 
 function render(snapshot) {
-  const host = snapshot.host || {}, runtime = snapshot.runtime || {}, vllm = snapshot.vllm || {}, gpu = (snapshot.gpus || [])[0], memory = snapshot.memory || {};
+  const host = snapshot.host || {}, runtime = snapshot.runtime || {}, vllm = snapshot.inference || snapshot.vllm || {}, backend = snapshot.backend || {}, gpu = (snapshot.gpus || [])[0], memory = snapshot.memory || {};
+  const backendName = backend.name || vllm.backend_name || "vLLM";
   activeModel = vllm.active_model || null;
   $("hostname").textContent = value(host.hostname);
   $("host-ip").textContent = value(host.primary_ip);
   $("host-cpu").textContent = value(host.cpu_model_short || host.cpu_model);
   $("host-ram").textContent = fmtGiB(host.memory_total_bytes);
   $("host-gpu").textContent = value(gpu && gpu.model);
+  $("host-engine").textContent = backendName;
   $("host-os").textContent = `${value(host.os_name)} ${value(host.os_version)} · kernel ${value(host.kernel)}`;
   $("model").textContent = value(vllm.active_model);
   $("served").textContent = vllm.served_model_name ? `Served as ${vllm.served_model_name}` : "Served name unavailable";
-  const healthy = Boolean(vllm.api_healthy && vllm.metrics_healthy && runtime.running);
+  const runtimeHealthy = runtime.running !== false;
+  const healthy = Boolean(vllm.api_healthy && runtimeHealthy);
   $("health").textContent = healthy ? "Healthy" : "Attention needed";
   $("health-dot").className = `dot ${healthy ? "good" : ""}`;
-  $("health-detail").textContent = `API ${vllm.api_healthy ? "online" : "offline"} · metrics ${vllm.metrics_healthy ? "online" : "offline"}`;
+  $("health-detail").textContent = `${backendName} API ${vllm.api_healthy ? "online" : "offline"} · metrics ${vllm.metrics_healthy ? "online" : (vllm.metrics_optional ? "optional/off" : "offline")}`;
   if (gpu) {
     const usedPct = gpu.vram_total ? gpu.vram_used / gpu.vram_total * 100 : null;
     $("vram").textContent = `${fmtGiB(gpu.vram_used)} / ${fmtGiB(gpu.vram_total)}`; setBar("vram-bar", usedPct);
@@ -36,7 +39,8 @@ function render(snapshot) {
   $("kv-detail").textContent = vllm.kv_cache_capacity_tokens ? `${Number(vllm.kv_cache_capacity_tokens).toLocaleString()} token capacity` : "Capacity unavailable";
   $("headroom").textContent = fmtGiB(memory.headroom_bytes);
   const env = runtime.environment || {};
-  const fields = {"Context window":vllm.configured_max_model_len,"GPU memory target":env.GPU_MEMORY_UTILIZATION,"Precision / dtype":env.DTYPE,"Quantization":env.QUANTIZATION,"Max sequences":env.MAX_NUM_SEQS,"Max batched tokens":env.MAX_NUM_BATCHED_TOKENS,"Prefix caching":env.ENABLE_PREFIX_CACHING,"KV cache allocation":fmtGiB(vllm.kv_cache_memory_gib == null ? null : vllm.kv_cache_memory_gib*1073741824),"KV cache dtype":env.KV_CACHE_DTYPE,"CPU offload":env.CPU_OFFLOAD_GB,"Swap space":env.SWAP_SPACE,"Extra vLLM args":env.EXTRA_VLLM_ARGS,"vLLM version":vllm.vllm_version,"Container image":runtime.image,"Maximum concurrency":vllm.maximum_concurrency,"Model-weight VRAM":fmtGiB(vllm.model_weight_memory_gib == null ? null : vllm.model_weight_memory_gib*1073741824),"Runtime/backend memory":vllm.runtime_activation_memory_gib == null ? "Unavailable (not reported by vLLM)" : `${vllm.runtime_activation_memory_gib} GiB`,"External GPU memory":fmtGiB(memory.external_process_vram_bytes)};
+  const generation = vllm.generation_settings || {};
+  const fields = {"Inference engine":backendName,"Context window":vllm.configured_max_model_len,"Native context":vllm.native_context_tokens,"Temperature":generation.temperature,"Top K":generation.top_k,"Top P":generation.top_p,"Min P":generation.min_p,"Repeat penalty":generation.repeat_penalty,"GPU memory target":env.GPU_MEMORY_UTILIZATION,"Precision / dtype":env.DTYPE,"Quantization":env.QUANTIZATION,"Max sequences":env.MAX_NUM_SEQS,"Max batched tokens":env.MAX_NUM_BATCHED_TOKENS,"Prefix caching":env.ENABLE_PREFIX_CACHING,"KV cache allocation":fmtGiB(vllm.kv_cache_memory_gib == null ? null : vllm.kv_cache_memory_gib*1073741824),"KV cache dtype":env.KV_CACHE_DTYPE,"CPU offload":env.CPU_OFFLOAD_GB,"Swap space":env.SWAP_SPACE,"Extra vLLM args":env.EXTRA_VLLM_ARGS,"Backend version":vllm.vllm_version,"Container image":runtime.image,"Maximum concurrency":vllm.maximum_concurrency,"Prompt throughput":vllm.prompt_tokens_per_second == null ? null : `${vllm.prompt_tokens_per_second} tok/s`,"Output throughput":vllm.output_tokens_per_second == null ? null : `${vllm.output_tokens_per_second} tok/s`,"Model-weight VRAM":fmtGiB(vllm.model_weight_memory_gib == null ? null : vllm.model_weight_memory_gib*1073741824),"Runtime/backend memory":vllm.runtime_activation_memory_gib == null ? "Unavailable (not reported by backend)" : `${vllm.runtime_activation_memory_gib} GiB`,"External GPU memory":fmtGiB(memory.external_process_vram_bytes)};
   const tunables = $("tunables"); tunables.replaceChildren();
   Object.entries(fields).forEach(([key, itemValue]) => { const row=document.createElement("div"), term=document.createElement("dt"), description=document.createElement("dd"); term.textContent=key; description.textContent=value(itemValue); row.append(term,description); tunables.append(row); });
   $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
