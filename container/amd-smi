@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cli_path="${ROCM_PATH:-/opt/rocm-host}/libexec/amdsmi_cli/amdsmi_cli.py"
+if [[ ! -f "${cli_path}" ]]; then
+  echo "AMD SMI is unavailable: ${cli_path} was not mounted" >&2
+  exit 3
+fi
+
+export LD_LIBRARY_PATH="${ROCM_PATH:-/opt/rocm-host}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export PYTHONPATH="${ROCM_PATH:-/opt/rocm-host}/share/amd_smi${PYTHONPATH:+:${PYTHONPATH}}"
+exec python "${cli_path}" "$@"

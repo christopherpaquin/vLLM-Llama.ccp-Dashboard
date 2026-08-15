@@ -11,10 +11,10 @@ deployments. The intended product provides portable host/GPU discovery, safe
 runtime profiles and lifecycle operations, model management, detailed memory
 accounting, and reproducible benchmarks. It is not a chat frontend.
 
-> **Development status:** The repository currently contains a FastAPI/SQLite
+> **Development status:** The repository contains a deployable FastAPI/SQLite
 > backend foundation. Lifecycle execution remains disabled and the older
 > mutation-provider prototypes must not be used on a production vLLM host. There is no
-> frontend or supported deployment package yet. See
+> frontend yet. See
 > [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for the verified feature
 > matrix and [GOALS.md](GOALS.md) for the authoritative requirements.
 
@@ -27,14 +27,50 @@ interfaces, SQLAlchemy entities, and a versioned HTTP API. Read-only Linux,
 AMD SMI/ROCm SMI, Docker Compose, and vLLM endpoint discovery have been live
 validated on `scar.lab`.
 
-## Requirements
+## Deployment
+
+The supported scar deployment requires Ubuntu 24.04, Docker Engine with the
+Compose plugin, the existing ROCm installation, and a healthy vLLM endpoint.
+No Python virtual environment is needed on the deployment host.
+
+```bash
+./scripts/deploy.sh
+```
+
+That one command validates prerequisites, creates `.env` from the committed
+template when needed, builds the pinned portal image, starts the portal and its
+read-only Docker API proxy, and waits for health. Open the API documentation at
+`http://scar.lab:8088/docs` or query health at
+`http://scar.lab:8088/api/v1/health`.
+
+Both containers use Docker's `unless-stopped` restart policy. Because Docker is
+enabled at boot on scar, the deployment starts after a reboot without a venv,
+interactive shell, or separate systemd unit. The portal is isolated from the
+existing vLLM Compose project and does not mount its configuration or model
+cache.
+
+Configuration belongs in the ignored `.env`; `.env-template` documents all
+settings. Operational commands are:
+
+```bash
+./scripts/status.sh
+./healthcheck.sh
+./scripts/backup.sh
+./scripts/uninstall.sh
+```
+
+Uninstall preserves `/var/lib/vllm-management-portal` by default. The explicit
+`--purge-data` option permanently removes only that validated path. Neither mode
+changes the vLLM deployment, image, or model cache.
+
+## Development requirements
 
 - Python 3.12
 - A virtual environment
 - SQLite (provided through Python)
 
-AMD/NVIDIA tooling and a running vLLM service are not required for the current
-unit/API test suite.
+AMD/NVIDIA tooling and a running vLLM service are not required for the unit/API
+test suite. BATS is required for deployment-script tests.
 
 ## Development setup
 
@@ -75,6 +111,7 @@ unvalidated prototypes and are tracked as such in the implementation status.
 
 ```bash
 venv/bin/python -m pytest -q
+bats tests/deployment.bats
 ```
 
 The suite exercises request schemas, API integration, profile referential
@@ -90,13 +127,6 @@ a general supported release.
 
 See [the scar baseline](docs/SCAR_BASELINE.md) for collected values,
 unavailable measurements, and lifecycle safety evidence.
-
-## Deployment, backup, and uninstall
-
-Supported container deployment, persistent database mounts, backup, health,
-and safe uninstall scripts are required by `GOALS.md` but do not exist yet.
-Until those are implemented, this repository should only be run as a local
-development backend.
 
 ## License
 

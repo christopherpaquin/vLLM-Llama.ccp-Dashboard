@@ -1,0 +1,70 @@
+name: vllm-management-portal
+services:
+  docker-socket-proxy:
+    image: ${DOCKER_SOCKET_PROXY_IMAGE:-tecnativa/docker-socket-proxy:v0.4.2}
+    container_name: vllm-management-docker-proxy
+    restart: ${RESTART_POLICY:-unless-stopped}
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      LOG_LEVEL: warning
+      POST: 0
+      VERSION: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker-api
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+  portal:
+    image: ${PORTAL_IMAGE:-vllm-management-portal:0.1.0}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12.13-slim-trixie}
+    container_name: vllm-management-portal
+    hostname: ${HOST_HOSTNAME:-vllm-host}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+    environment:
+      DATABASE_URL: sqlite:////data/vllm_portal.db
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      HOST_OS_RELEASE_PATH: /host/etc/os-release
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000}
+      ROCM_PATH: /opt/rocm-host
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - "${VIDEO_GID:-44}"
+      - "${RENDER_GID:-992}"
+    volumes:
+      - ${PORTAL_DATA_DIR:-/var/lib/vllm-management-portal}:/data
+      - ${ROCM_PATH:-/opt/rocm-7.2.2}:/opt/rocm-host:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /usr/bin/docker:/usr/local/bin/docker:ro
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - ${PORTAL_BIND_ADDRESS:-0.0.0.0}:${PORTAL_PORT:-8088}:8080
+    networks:
+      - default
+      - docker-api
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+networks:
+  default: {}
+  docker-api:
+    internal: true

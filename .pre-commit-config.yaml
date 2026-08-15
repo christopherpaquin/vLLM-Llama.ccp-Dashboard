@@ -71,5 +71,12 @@ repos:
         name: "format: remove UTF-8 BOM"
       - id: detect-private-key
         name: "security: detect private keys"
+  - repo: local
+    hooks:
+      - id: check-image-pins
+        name: "containers: no floating image tags"
+        entry: scripts/check-image-pins.sh
+        language: system
+        files: '(^|/)(Dockerfile|compose\.yaml|\.env-template)$'
 default_language_version:
   python: python3

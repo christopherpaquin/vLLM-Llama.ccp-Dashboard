@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import re
 import shutil
@@ -48,8 +49,10 @@ def read_text(url: str, timeout: float = 3.0) -> tuple[bool, str | None]:
 class HostDiscovery:
     """Collect normalized, non-destructive Linux host capabilities."""
 
-    def __init__(self, os_release: Path = Path("/etc/os-release")) -> None:
-        self.os_release = os_release
+    def __init__(self, os_release: Path | None = None) -> None:
+        self.os_release = os_release or Path(
+            os.getenv("HOST_OS_RELEASE_PATH", "/etc/os-release")
+        )
 
     def discover(self) -> dict[str, Any]:
         release = self._read_os_release()
@@ -130,15 +133,15 @@ class DockerVLLMDiscovery:
                 "lifecycle_mechanism": "Unknown",
                 "container": None,
             }
-        candidate = next(
-            (
-                item
-                for item in containers
-                if "vllm" in str(item.get("Names", "")).lower()
-                or "vllm" in str(item.get("Image", "")).lower()
-            ),
-            None,
-        )
+        candidates = [
+            item
+            for item in containers
+            if "vllm" in str(item.get("Names", "")).lower()
+            or "vllm" in str(item.get("Image", "")).lower()
+        ]
+        # Prefer the inference server over this management portal. Both names
+        # intentionally contain "vllm", so first-match discovery is unsafe.
+        candidate = max(candidates, key=self._candidate_score, default=None)
         if not candidate:
             return {
                 "runtime": "docker",
@@ -187,6 +190,19 @@ class DockerVLLMDiscovery:
                 None,
             ),
         }
+
+    @staticmethod
+    def _candidate_score(item: dict[str, Any]) -> int:
+        name = str(item.get("Names", "")).lower()
+        image = str(item.get("Image", "")).lower()
+        score = 0
+        if name == "vllm":
+            score += 100
+        if image.startswith("rocm/vllm") or image.startswith("vllm/vllm"):
+            score += 50
+        if "management" in name or "management" in image or "portal" in name:
+            score -= 100
+        return score
 
     @staticmethod
     def _safe_environment(items: list[str]) -> dict[str, str]:
@@ -332,7 +348,9 @@ class CapabilityDiscoveryService:
         docker = DockerVLLMDiscovery(self.runner).discover()
         gpu_provider = self._gpu_provider()
         gpus = [gpu.to_dict() for gpu in gpu_provider.get_gpu_devices()]
-        endpoint = VLLMEndpointDiscovery().discover()
+        endpoint = VLLMEndpointDiscovery(
+            os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000")
+        ).discover()
         logs = ""
         if docker.get("container"):
             try:

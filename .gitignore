@@ -8,3 +8,4 @@ venv/
 *.sqlite
 *.sqlite3
 .env
+backups/

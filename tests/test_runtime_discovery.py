@@ -72,6 +72,24 @@ def test_docker_compose_discovery_and_safe_preview() -> None:
     ]
 
 
+def test_docker_discovery_ignores_management_portal_name_collision() -> None:
+    containers = [
+        {"Names": "vllm-management-portal", "Image": "vllm-management-portal:0.1.0"},
+        {"Names": "vllm", "Image": "rocm/vllm:rocm7.14.0"},
+    ]
+
+    def runner(command: list[str]) -> subprocess.CompletedProcess[str]:
+        if command[:2] == ["docker", "ps"]:
+            output = "\n".join(json.dumps(item) for item in containers)
+            return subprocess.CompletedProcess(command, 0, output, "")
+        if command[:2] == ["docker", "inspect"]:
+            inspected = [{"Config": {"Image": "rocm/vllm:rocm7.14.0"}, "State": {}}]
+            return subprocess.CompletedProcess(command, 0, json.dumps(inspected), "")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    assert DockerVLLMDiscovery(runner).discover()["container"] == "vllm"
+
+
 def test_metrics_and_startup_logs_are_parsed_without_estimates() -> None:
     metrics = 'vllm:kv_cache_usage_perc{engine="0"} 0.25\n'
     assert VLLMEndpointDiscovery._metric(metrics, "vllm:kv_cache_usage_perc", 100) == 25
