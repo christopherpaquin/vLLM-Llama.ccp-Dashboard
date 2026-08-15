@@ -73,3 +73,10 @@ test "$SCRIPT_DIR" = /caller/scripts
   run grep -F 'container_name: vllm-llama-cpp-dashboard-docker-proxy' "${PROJECT_ROOT}/compose.yaml"
   [ "${status}" -eq 0 ]
 }
+
+@test "host AMD GPU identity table is mounted read-only" {
+  run grep -F ':/usr/share/libdrm/amdgpu.ids:ro' "${PROJECT_ROOT}/compose.yaml"
+  [ "${status}" -eq 0 ]
+  run grep -F 'AMDGPU_IDS_PATH=' "${PROJECT_ROOT}/.env-template"
+  [ "${status}" -eq 0 ]
+}

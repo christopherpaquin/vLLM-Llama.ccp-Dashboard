@@ -62,7 +62,8 @@ the quick benchmark. See the
 Host identity comes from `.env`; deployment detects the primary IPv4 source
 address with `ip route`. CPU and RAM come from read-only Linux `/proc` and
 `psutil` data. GPU identity and utilization come from AMD SMI, with ROCm SMI
-as the fallback provider.
+as the fallback provider. The host AMD GPU ID table is mounted read-only so
+newer cards retain their exact product names inside the dashboard container.
 
 ## 🚀 Deploy
 
@@ -94,6 +95,7 @@ running containers.
 | `INFERENCE_BASE_URL` | `http://host.docker.internal:8000` | Inference server URL |
 | `INFERENCE_HOSTNAME` | `inference-host` | Host name displayed on the dashboard |
 | `ROCM_PATH` | `/opt/rocm-7.2.2` | Host ROCm installation |
+| `AMDGPU_IDS_PATH` | `/opt/amdgpu/share/libdrm/amdgpu.ids` | Host AMD model-name table |
 | `MODEL_CACHE_PATH` | `/var/lib/vllm/huggingface/hub` | HF cache or llama.cpp GGUF directory |
 | `RESTART_POLICY` | `unless-stopped` | Docker restart behavior |
 

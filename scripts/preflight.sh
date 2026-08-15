@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck disable=SC1091 # Path is resolved from this script at runtime.
 source "${SCRIPT_DIR}/lib/common.sh"
 
 require_command docker
@@ -23,6 +23,7 @@ load_environment
 [[ "${PORTAL_DATA_DIR:-}" == /* ]] || fail "PORTAL_DATA_DIR must be an absolute path"
 [[ "${PORTAL_DATA_DIR}" != "/" ]] || fail "PORTAL_DATA_DIR cannot be /"
 [[ -d "${ROCM_PATH:-/nonexistent}" ]] || fail "Configured ROCm path does not exist: ${ROCM_PATH:-unset}"
+[[ -f "${AMDGPU_IDS_PATH:-/nonexistent}" ]] || fail "Configured AMD GPU ID table does not exist: ${AMDGPU_IDS_PATH:-unset}"
 [[ -e /dev/kfd && -d /dev/dri ]] || fail "AMD GPU device nodes /dev/kfd and /dev/dri are required"
 
 log "Preflight passed"
