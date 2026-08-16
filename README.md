@@ -17,7 +17,7 @@ The landing page puts the current runtime first:
 | Area | Information | Status |
 | --- | --- | --- |
 | Host | Hostname, primary IP, OS/kernel, CPU model, total RAM | ✅ Live |
-| Model | Active repository, served name, API and metrics health | ✅ Live |
+| Model | Active repository, API and metrics health | ✅ Live |
 | GPU | Utilization, VRAM, temperature, power, headroom | ✅ Live on AMD SMI |
 | Engine | Configured vLLM or llama.cpp provider | ✅ Visible in the host tile |
 | KV cache | Utilization, allocation, token capacity, concurrency | ✅ Where the backend reports it |

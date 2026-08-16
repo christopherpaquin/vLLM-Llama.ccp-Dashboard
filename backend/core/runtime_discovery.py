@@ -699,18 +699,6 @@ def build_normalized_configuration(
             else "unavailable",
             "tooltip": "Size of the model weights. Larger models generally require more memory and memory bandwidth.",
         },
-        {
-            "key": "served_model_name",
-            "label": "Served As",
-            "value": inference.get("served_model_name") or env.get("SERVED_MODEL_NAME"),
-            "formatted": inference.get("served_model_name")
-            or env.get("SERVED_MODEL_NAME")
-            or "Unavailable",
-            "source": "runtime"
-            if inference.get("served_model_name")
-            else ("configured" if env.get("SERVED_MODEL_NAME") else "unavailable"),
-            "tooltip": "Alias or identifier under which the model is exposed to API clients.",
-        },
     ]
 
     # 2. CONTEXT & MEMORY

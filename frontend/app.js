@@ -30,7 +30,6 @@ function renderRuntimeGroups(config, snapshot, backend, vllm, runtime, gpu, memo
       { key: "engine", label: "Inference Engine", value: backend.name || "vLLM", formatted: backend.name || "vLLM", source: "runtime", tooltip: "Backend currently serving the model. Different engines expose different performance and memory controls." },
       { key: "quantization", label: "Quantization", value: isLlama ? (vllm.model_quantization || env.QUANTIZATION) : (env.QUANTIZATION || env.DTYPE), formatted: value(isLlama ? (vllm.model_quantization || env.QUANTIZATION) : (env.QUANTIZATION || env.DTYPE)), source: "runtime", tooltip: "Numeric precision used for model weights. Lower precision reduces VRAM and can improve speed, but may slightly reduce model accuracy." },
       { key: "model_size", label: "Model Size", value: vllm.model_size_bytes || vllm.model_weight_memory_gib, formatted: vllm.model_size_bytes ? fmtGiB(vllm.model_size_bytes) : (vllm.model_weight_memory_gib ? `${vllm.model_weight_memory_gib} GiB` : "Unavailable"), source: "runtime", tooltip: "Size of the model weights. Larger models generally require more memory and memory bandwidth." },
-      { key: "served_model_name", label: "Served As", value: vllm.served_model_name, formatted: value(vllm.served_model_name), source: "runtime", tooltip: "Alias or identifier under which the model is exposed to API clients." },
     ];
 
     const ctx = vllm.configured_max_model_len || (isLlama ? env.LLAMA_ARG_CTX_SIZE : env.MAX_MODEL_LEN);
@@ -220,7 +219,6 @@ function render(snapshot) {
   $("host-os").textContent = `${value(host.os_name)} ${value(host.os_version)} · kernel ${value(host.kernel)}`;
 
   $("model").textContent = value(vllm.active_model);
-  $("served").textContent = vllm.served_model_name ? `Served as ${vllm.served_model_name}` : "Served name unavailable";
 
   const runtimeHealthy = runtime.running !== false;
   const healthy = Boolean(vllm.api_healthy && runtimeHealthy);

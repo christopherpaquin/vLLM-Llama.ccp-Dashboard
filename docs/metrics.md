@@ -8,7 +8,7 @@ This document explains the runtime tunables, memory fields, performance metrics,
 
 The dashboard groups runtime tunables into eight organized categories:
 
-1. **Model**: Active model identity, engine type, quantization format, file size, and served aliases.
+1. **Model**: Active model identity, engine type, quantization format, and file size.
 2. **Context & Memory**: Configured and native context lengths, KV cache precision/size, total token capacity, active utilization, GPU VRAM allocation, headroom, and process-attributed memory.
 3. **Scheduling & Concurrency**: Parallel slot counts, layer offloading, batch/microbatch sizes, max sequences, batched tokens, tensor/pipeline parallelism, CPU offload, and swap space.
 4. **Attention & Cache**: Flash attention mode, prompt caching / prefix caching, chunked prefill, unified KV pools, and execution graph compilation mode.

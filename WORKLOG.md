@@ -35,3 +35,9 @@
 **Decision:** Validated normalized runtime configuration categories (Model, Context & Memory, Scheduling, Attention & Cache, Speculative Decoding, Sampling, GPU & Hardware, Performance), educational tooltips on hover/touch, source badges, and engine-specific row filtering.
 **Why:** Complies with GOALS.md and user prompt requirements to deliver an intuitive, educational, and strictly non-hallucinating operational dashboard.
 **Progress:** Completed. 37 pytest tests, 11 BATS tests, and full pre-commit validation pass cleanly.
+
+## 2026-08-15 20:29
+**Task:** Remove redundant 'Served As' from dashboard hero section, configuration categories, and documentation
+**Decision:** Removed 'Served As' from the active model card and the MODEL configuration group to avoid duplicate model name display.
+**Why:** User confirmed 'Model' and 'Served As' are redundant in the operational UI.
+**Progress:** Completed. 37 pytest tests and 11 BATS tests pass.
