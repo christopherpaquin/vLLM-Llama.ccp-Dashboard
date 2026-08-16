@@ -121,10 +121,13 @@ The configured directory is mounted read-only. llama.cpp Prometheus metrics
 are optional and require `llama-server --metrics`; health, model identity,
 properties, and benchmarks still work when metrics are disabled.
 
-Runtime details are provider-specific. A llama.cpp deployment shows verified
-llama.cpp settings such as context, quantization, parallel slots, GPU layers,
-batching, build version, and its actual inference image; vLLM-only settings are
-not displayed as unavailable llama.cpp values.
+Runtime details are organized into normalized groups (Model, Context & Memory,
+Scheduling & Concurrency, Attention & Cache, Speculative Decoding, Sampling,
+GPU & Hardware, Performance) with interactive educational tooltips on hover and
+touch. A llama.cpp deployment shows verified llama.cpp settings such as context,
+quantization, parallel slots, GPU layers, batching, and build version; vLLM-only
+settings are hidden rather than displayed as unavailable. See
+[docs/metrics.md](docs/metrics.md) for the complete tunable and metric reference.
 
 ## 🧪 Benchmark
 

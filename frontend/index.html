@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Infrence Engine Dashboard</title>
-    <link rel="stylesheet" href="/assets/styles.css?v=2">
+    <link rel="stylesheet" href="/assets/styles.css?v=3">
   </head>
   <body>
     <header>
@@ -24,7 +24,7 @@
       <section class="metrics">
         <article class="panel metric"><span class="label">VRAM</span><strong id="vram">—</strong><div class="bar"><i id="vram-bar"></i></div><small id="vram-detail">Loading GPU telemetry…</small></article>
         <article class="panel metric"><span class="label">GPU UTILIZATION</span><strong id="gpu">—</strong><div class="bar"><i id="gpu-bar"></i></div><small id="gpu-detail">Loading GPU telemetry…</small></article>
-        <article class="panel metric"><span class="label">KV CACHE</span><strong id="kv">—</strong><div class="bar"><i id="kv-bar"></i></div><small id="kv-detail">Loading vLLM metrics…</small></article>
+        <article class="panel metric"><span class="label">KV CACHE</span><strong id="kv">—</strong><div class="bar"><i id="kv-bar"></i></div><small id="kv-detail">Loading KV metrics…</small></article>
         <article class="panel metric"><span class="label">VRAM HEADROOM</span><strong id="headroom">—</strong><small>Measured free device memory</small></article>
       </section>
 
@@ -46,12 +46,12 @@
         </article>
       </section>
 
-      <details class="panel">
-        <summary><span><span class="label">RUNTIME DETAILS</span><strong>Inference configuration and telemetry</strong></span><span>Expand</span></summary>
-        <dl id="tunables"></dl>
+      <details class="panel" open>
+        <summary><span><span class="label">RUNTIME CONFIGURATION</span><strong>Inference configuration and telemetry</strong></span><span class="expand-status">Collapse</span></summary>
+        <div id="tunables" class="runtime-groups"></div>
       </details>
       <p id="page-error" role="alert"></p>
     </main>
-    <script src="/assets/app.js?v=3" defer></script>
+    <script src="/assets/app.js?v=4" defer></script>
   </body>
 </html>

@@ -196,6 +196,35 @@ def test_llama_cpp_endpoint_discovery_uses_official_read_only_apis(monkeypatch) 
                 "build_info": "b10438-abcdef",
             },
         ),
+        "/slots": (
+            True,
+            [
+                {
+                    "id": 0,
+                    "n_ctx": 8192,
+                    "is_processing": False,
+                    "n_prompt_tokens_cache": 0,
+                },
+                {
+                    "id": 1,
+                    "n_ctx": 8192,
+                    "is_processing": False,
+                    "n_prompt_tokens_cache": 0,
+                },
+                {
+                    "id": 2,
+                    "n_ctx": 8192,
+                    "is_processing": False,
+                    "n_prompt_tokens_cache": 0,
+                },
+                {
+                    "id": 3,
+                    "n_ctx": 8192,
+                    "is_processing": False,
+                    "n_prompt_tokens_cache": 0,
+                },
+            ],
+        ),
     }
     monkeypatch.setattr(
         "core.runtime_discovery.read_json",
@@ -219,9 +248,65 @@ def test_llama_cpp_endpoint_discovery_uses_official_read_only_apis(monkeypatch) 
     assert result["model_quantization"] == "Q4_K - Medium"
     assert result["maximum_concurrency"] == 4
     assert result["backend_version"] == "b10438-abcdef"
+    assert result["kv_cache_capacity_tokens"] == 32768
+    assert result["kv_cache_utilization_percent"] == 0.0
     assert result["prompt_tokens_per_second"] == 120
     assert result["output_tokens_per_second"] == 48
     assert result["generation_settings"]["temperature"] == 0.8
+
+
+def test_llama_cpp_kv_cache_telemetry_sources(monkeypatch) -> None:
+    # 1. Prometheus metric ratio priority
+    responses = {
+        "/health": (True, {"status": "ok"}),
+        "/v1/models": (True, {"data": [{"id": "model.gguf"}]}),
+        "/props": (
+            True,
+            {"default_generation_settings": {"n_ctx": 4096}, "total_slots": 2},
+        ),
+        "/slots": (True, [{"id": 0, "n_ctx": 4096, "is_processing": False}]),
+    }
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_json",
+        lambda url: responses[next(path for path in responses if url.endswith(path))],
+    )
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_text",
+        lambda url: (True, "llamacpp:kv_cache_usage_ratio 0.355\n"),
+    )
+    result = LlamaCppEndpointDiscovery("http://llama:8080").discover()
+    assert result["kv_cache_capacity_tokens"] == 4096
+    assert result["kv_cache_utilization_percent"] == 35.5
+
+    # 2. Live slot activity calculation when Prometheus ratio metric is absent
+    responses["/slots"] = (
+        True,
+        [
+            {"id": 0, "n_ctx": 4096, "is_processing": True, "n_prompt_tokens": 1024},
+            {
+                "id": 1,
+                "n_ctx": 4096,
+                "is_processing": False,
+                "n_prompt_tokens_cache": 512,
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_text",
+        lambda url: (True, "llamacpp:prompt_tokens_seconds 50\n"),
+    )
+    result = LlamaCppEndpointDiscovery("http://llama:8080").discover()
+    assert result["kv_cache_capacity_tokens"] == 8192
+    assert result["kv_cache_utilization_percent"] == 18.75  # (1024 + 512) / 8192 * 100
+
+    # 3. Unavailable endpoints fallback without fabrication
+    responses["/slots"] = (False, None)
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_text",
+        lambda url: (False, None),
+    )
+    result = LlamaCppEndpointDiscovery("http://llama:8080").discover()
+    assert result["kv_cache_capacity_tokens"] == 8192  # 4096 * 2 from props
     assert result["kv_cache_utilization_percent"] is None
 
 
@@ -242,3 +327,210 @@ def test_metrics_and_startup_logs_are_parsed_without_estimates() -> None:
     assert parsed["kv_cache_capacity_tokens"] == 50336
     assert parsed["runtime_activation_memory_gib"] is None
     assert parsed["memory_source"] == "Reported by vLLM"
+
+
+def test_build_normalized_configuration_llama_cpp() -> None:
+    from core.runtime_discovery import build_normalized_configuration
+
+    inference = {
+        "active_model": "Qwen3.8-27B-Q4_K_M.gguf",
+        "served_model_name": "qwen3.8-27b",
+        "configured_max_model_len": 65536,
+        "native_context_tokens": 262144,
+        "model_size_bytes": 17072521216,
+        "model_quantization": "Q4_K - Medium",
+        "maximum_concurrency": 1,
+        "kv_cache_capacity_tokens": 65536,
+        "kv_cache_utilization_percent": 0.0,
+        "prompt_tokens_per_second": 0.0,
+        "output_tokens_per_second": 0.0,
+        "generation_settings": {
+            "temperature": 0.8,
+            "top_k": 40,
+            "top_p": 0.95,
+            "min_p": 0.05,
+            "repeat_penalty": 1.1,
+        },
+    }
+    docker = {
+        "environment": {
+            "LLAMA_ARG_MODEL": "/models/Qwen3.8-27B-Q4_K_M.gguf",
+            "LLAMA_ARG_CTX_SIZE": "65536",
+            "LLAMA_ARG_N_GPU_LAYERS": "99",
+            "LLAMA_ARG_BATCH": "2048",
+            "LLAMA_ARG_UBATCH": "512",
+            "LLAMA_ARG_PARALLEL": "1",
+            "LLAMA_ARG_FLASH_ATTN": "auto",
+            "LLAMA_ARG_CACHE_TYPE_K": "q8_0",
+            "LLAMA_ARG_CACHE_TYPE_V": "q8_0",
+            "LLAMA_ARG_CACHE_PROMPT": "1",
+        }
+    }
+    gpus = [
+        {
+            "vram_used": 20185088000,
+            "vram_total": 34225520640,
+            "gpu_utilization": 0.0,
+            "memory_utilization": 5.0,
+            "core_clock": 1950.0,
+            "memory_clock": 900.0,
+            "power_draw": 46.0,
+            "power_limit": 300.0,
+            "temperature": 41.0,
+            "compute_runtime_version": "ROCm 7.2.2",
+            "driver_version": "6.12.0",
+        }
+    ]
+    memory = {
+        "vllm_process_vram_bytes": 18000000000,
+        "headroom_bytes": 14040432640,
+    }
+
+    config = build_normalized_configuration(
+        "llama_cpp", inference, docker, gpus, memory
+    )
+
+    assert config["engine"] == "llama.cpp"
+    assert config["engine_type"] == "llama_cpp"
+    assert len(config["groups"]) == 8
+
+    # All items must have tooltips and labels
+    all_items = [item for group in config["groups"] for item in group["items"]]
+    for item in all_items:
+        assert item["label"], f"Missing label for {item}"
+        assert item["tooltip"], f"Missing tooltip for {item['label']}"
+        assert item["source"] in (
+            "runtime",
+            "configured",
+            "measured",
+            "default",
+            "benchmark",
+            "unavailable",
+        )
+
+    # Group titles check
+    titles = [g["title"] for g in config["groups"]]
+    assert "MODEL" in titles
+    assert "CONTEXT & MEMORY" in titles
+    assert "SCHEDULING & CONCURRENCY" in titles
+    assert "ATTENTION & CACHE" in titles
+    assert "SPECULATIVE DECODING" in titles
+    assert "SAMPLING" in titles
+    assert "GPU & HARDWARE" in titles
+    assert "PERFORMANCE" in titles
+
+    # Check llama.cpp specific values
+    sched_items = next(g["items"] for g in config["groups"] if g["id"] == "scheduling")
+    sched_keys = [item["key"] for item in sched_items]
+    assert "gpu_layers" in sched_keys
+    assert "parallel_slots" in sched_keys
+    assert "batch_size" in sched_keys
+    assert "ubatch_size" in sched_keys
+    assert "max_num_seqs" not in sched_keys
+
+    gpu_layers_item = next(item for item in sched_items if item["key"] == "gpu_layers")
+    assert gpu_layers_item["formatted"] == "All layers GPU resident (99)"
+
+    ctx_items = next(
+        g["items"] for g in config["groups"] if g["id"] == "context_memory"
+    )
+    ctx_keys = [item["key"] for item in ctx_items]
+    assert "kv_cache_type_k" in ctx_keys
+    assert "kv_cache_type_v" in ctx_keys
+    assert "gpu_memory_utilization" not in ctx_keys
+
+
+def test_build_normalized_configuration_vllm() -> None:
+    from core.runtime_discovery import build_normalized_configuration
+
+    inference = {
+        "active_model": "stelterlab/Qwen3-Coder-30B-A3B-Instruct-AWQ",
+        "served_model_name": "qwen3-coder-30b-a3b",
+        "configured_max_model_len": 32768,
+        "model_weight_memory_gib": 15.74,
+        "kv_cache_memory_gib": 4.61,
+        "kv_cache_capacity_tokens": 50336,
+        "kv_cache_utilization_percent": 12.5,
+        "prompt_tokens_per_second": 1240.0,
+        "output_tokens_per_second": 27.5,
+        "ttft_seconds": 0.779,
+        "e2e_seconds": 2.118,
+    }
+    docker = {
+        "environment": {
+            "MODEL_ID": "stelterlab/Qwen3-Coder-30B-A3B-Instruct-AWQ",
+            "MAX_MODEL_LEN": "32768",
+            "GPU_MEMORY_UTILIZATION": "0.68",
+            "QUANTIZATION": "AWQ",
+            "KV_CACHE_DTYPE": "auto",
+            "MAX_NUM_SEQS": "8",
+            "MAX_NUM_BATCHED_TOKENS": "8192",
+            "ENABLE_PREFIX_CACHING": "1",
+            "ENABLE_CHUNKED_PREFILL": "1",
+            "TENSOR_PARALLEL_SIZE": "1",
+        }
+    }
+    gpus = [
+        {
+            "vram_used": 32085088000,
+            "vram_total": 34225520640,
+            "gpu_utilization": 37.0,
+            "memory_utilization": 42.0,
+            "core_clock": 2100.0,
+            "memory_clock": 900.0,
+            "power_draw": 245.0,
+            "power_limit": 300.0,
+            "temperature": 48.0,
+            "compute_runtime_version": "ROCm 7.14.0",
+            "driver_version": "6.12.0",
+        }
+    ]
+    memory = {
+        "vllm_process_vram_bytes": 24360000000,
+        "headroom_bytes": 2140432640,
+    }
+
+    config = build_normalized_configuration("vllm", inference, docker, gpus, memory)
+
+    assert config["engine"] == "vLLM"
+    assert config["engine_type"] == "vllm"
+
+    # Check vLLM specific values
+    sched_items = next(g["items"] for g in config["groups"] if g["id"] == "scheduling")
+    sched_keys = [item["key"] for item in sched_items]
+    assert "max_num_seqs" in sched_keys
+    assert "max_num_batched_tokens" in sched_keys
+    assert "tensor_parallel_size" in sched_keys
+    assert "gpu_layers" not in sched_keys
+    assert "parallel_slots" not in sched_keys
+
+    ctx_items = next(
+        g["items"] for g in config["groups"] if g["id"] == "context_memory"
+    )
+    ctx_keys = [item["key"] for item in ctx_items]
+    assert "gpu_memory_utilization" in ctx_keys
+    assert "kv_cache_dtype" in ctx_keys
+    assert "kv_cache_size" in ctx_keys
+    assert "kv_cache_type_k" not in ctx_keys
+
+    attn_items = next(
+        g["items"] for g in config["groups"] if g["id"] == "attention_cache"
+    )
+    attn_keys = [item["key"] for item in attn_items]
+    assert "prefix_caching" in attn_keys
+    assert "chunked_prefill" in attn_keys
+    assert "compilation_mode" in attn_keys
+    assert "kv_unified" not in attn_keys
+
+
+def test_build_normalized_configuration_graceful_missing_metrics() -> None:
+    from core.runtime_discovery import build_normalized_configuration
+
+    config = build_normalized_configuration("llama_cpp", {}, {}, [], {})
+
+    assert config["engine"] == "llama.cpp"
+    for group in config["groups"]:
+        for item in group["items"]:
+            assert item["tooltip"], f"Missing tooltip for {item['label']}"
+            # Unavailable items should format cleanly as Unavailable or Idle or Default
+            assert item["formatted"] is not None

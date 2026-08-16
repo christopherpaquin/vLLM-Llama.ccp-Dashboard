@@ -65,9 +65,26 @@ async def health_check(db: Session = Depends(get_db)):
 
 
 @router.get("/capabilities", response_model=dict)
-async def capabilities():
+async def capabilities(db: Session = Depends(get_db)):
     """Refresh and return a non-destructive live capability snapshot."""
-    return CapabilityDiscoveryService().discover()
+    snapshot = CapabilityDiscoveryService().discover()
+    try:
+        latest = db.query(Benchmark).order_by(Benchmark.created_at.desc()).first()
+        if latest:
+            snapshot["latest_benchmark"] = {
+                "id": latest.id,
+                "ttft_seconds": latest.ttft_p50,
+                "output_tokens_per_second": latest.decode_tps,
+                "e2e_seconds": latest.e2e,
+                "prompt_tokens": latest.prompt_tokens,
+                "output_tokens": latest.output_tokens,
+                "created_at": latest.created_at.isoformat()
+                if latest.created_at
+                else None,
+            }
+    except Exception:
+        pass
+    return snapshot
 
 
 @router.get("/models/cached", response_model=dict)
