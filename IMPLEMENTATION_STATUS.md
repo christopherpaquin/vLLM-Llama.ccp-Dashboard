@@ -1,4 +1,4 @@
-# Infrence Engine Dashboard — Implementation Status
+# Inference Engine Dashboard — Implementation Status
 
 Last verified: 2026-08-15
 
@@ -28,7 +28,7 @@ stubs are not counted as complete.
 | Operation history and logs | Partial | A generic log table and unvalidated endpoints exist. Lifecycle event capture, bounded/tailable manager and vLLM logs, and access scoping are missing. |
 | Health reporting | Partial | Manager response, database, vLLM API, metrics, and GPU telemetry checks are implemented and live-tested. Adapter failure detail can be expanded. |
 | Authentication and authorization | Missing | No authentication, sessions, password hashing, logout, or rate limiting exists. |
-| Frontend | Partial | The Infrence Engine Dashboard is deployed on scar with host identity/hardware, active model/health, VRAM/GPU/KV summaries, provider-specific runtime details, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
+| Frontend | Partial | The Inference Engine Dashboard is deployed on scar with host identity/hardware, active model/health, VRAM/GPU/KV summaries, provider-specific runtime details, explicit dropdown states, cached models, and interactive benchmark results. Model activation remains safety-locked; history and advanced workflows are absent. |
 | Containerized deployment | Complete for scar baseline | One-click Docker Compose deployment uses pinned images, a non-root/read-only portal, least-privilege Docker socket proxy, persistent data, healthcheck, and `unless-stopped` boot restart. Live deployed on scar. |
 | Backup / uninstall | Complete for scar baseline | Tested scripts back up persistent data and uninstall containers while preserving data by default. Purge is restricted to the exact portal data path and never touches vLLM. |
 | Automated tests | Partial | 33 pytest and 11 BATS tests cover backend/dashboard behavior, provider-specific details, vLLM/llama.cpp parsing/configuration, inference-container selection, image pinning, container identity, restart policy, environment-driven host identity, portability, read-only cache/AMD identity mounting, AMD SMI, and shell safety. Broader browser/matrix/security coverage remains. |

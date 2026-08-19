@@ -9,7 +9,7 @@ def test_dashboard_is_served_at_root() -> None:
     response = TestClient(app).get("/")
 
     assert response.status_code == 200
-    assert "Infrence Engine Dashboard" in response.text
+    assert "Inference Engine Dashboard" in response.text
     assert "vLLM DASHBOARD" not in response.text
     assert "Runtime overview" not in response.text
     assert "styles.css?v=" in response.text

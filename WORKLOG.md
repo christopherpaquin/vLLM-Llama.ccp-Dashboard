@@ -41,3 +41,9 @@
 **Decision:** Removed 'Served As' from the active model card and the MODEL configuration group to avoid duplicate model name display.
 **Why:** User confirmed 'Model' and 'Served As' are redundant in the operational UI.
 **Progress:** Completed. 37 pytest tests and 11 BATS tests pass.
+
+## 2026-08-18 22:42
+**Task:** Correct typo INFRENCE to INFERENCE in dashboard frontend and documentation
+**Decision:** Updated header eyebrow, HTML page title, frontend test assertion, README.md, IMPLEMENTATION_STATUS.md, and docs/metrics.md to fix spelling of Inference.
+**Why:** The UI and documentation contained a spelling typo "INFRENCE" / "Infrence".
+**Progress:** Completed. Tests and pre-commit checks pass cleanly.

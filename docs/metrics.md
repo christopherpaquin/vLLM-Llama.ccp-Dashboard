@@ -1,6 +1,6 @@
 # Inference Metrics and Runtime Configuration Reference
 
-This document explains the runtime tunables, memory fields, performance metrics, and educational tooltips displayed by the Infrence Engine Dashboard for both **vLLM** and **llama.cpp** deployments.
+This document explains the runtime tunables, memory fields, performance metrics, and educational tooltips displayed by the Inference Engine Dashboard for both **vLLM** and **llama.cpp** deployments.
 
 ---
 
