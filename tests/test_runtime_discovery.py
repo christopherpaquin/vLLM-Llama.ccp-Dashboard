@@ -10,6 +10,7 @@ from core.runtime_discovery import (
     LlamaCppEndpointDiscovery,
     VLLMEndpointDiscovery,
     VLLMLogTelemetryParser,
+    VLLMModelMetadataDiscovery,
 )
 
 
@@ -314,6 +315,23 @@ def test_metrics_and_startup_logs_are_parsed_without_estimates() -> None:
     metrics = 'vllm:kv_cache_usage_perc{engine="0"} 0.25\n'
     assert VLLMEndpointDiscovery._metric(metrics, "vllm:kv_cache_usage_perc", 100) == 25
 
+
+def test_vllm_endpoint_preserves_zero_kv_cache_utilization(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_text",
+        lambda url: (True, "vllm:kv_cache_usage_perc 0.0\n"),
+    )
+    monkeypatch.setattr(
+        "core.runtime_discovery.read_json",
+        lambda url: (True, {"data": [{"id": "served", "root": "owner/model"}]}),
+    )
+
+    result = VLLMEndpointDiscovery("http://vllm:8000").discover()
+
+    assert result["kv_cache_utilization_percent"] == 0.0
+
+
+def test_startup_logs_are_parsed_without_estimates() -> None:
     parsed = VLLMLogTelemetryParser.parse(
         "Using max model len 32,768\n"
         "V1 LLM engine (v0.23.1)\n"
@@ -321,12 +339,43 @@ def test_metrics_and_startup_logs_are_parsed_without_estimates() -> None:
         "Available KV cache memory: 4.61 GiB\n"
         "GPU KV cache size: 50,336 tokens\n"
         "Maximum concurrency for 32,768 tokens per request: 1.54x\n"
+        "quantization=compressed-tensors, kv_cache_dtype=fp8, "
+        "tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, "
+        "enable_prefix_caching=True, enable_chunked_prefill=True\n"
+        "non-default args: {'max_num_seqs': 32}\n"
     )
 
     assert parsed["model_weight_memory_gib"] == 15.74
     assert parsed["kv_cache_capacity_tokens"] == 50336
     assert parsed["runtime_activation_memory_gib"] is None
     assert parsed["memory_source"] == "Reported by vLLM"
+    assert parsed["model_quantization"] == "compressed-tensors"
+    assert parsed["max_num_seqs"] == 32
+    assert parsed["prefix_caching"] == "True"
+
+
+def test_vllm_model_metadata_reads_nested_text_config(tmp_path: Path) -> None:
+    snapshot = (
+        tmp_path / "models--RedHatAI--Qwen3.8-27B-INT4" / "snapshots" / "revision"
+    )
+    snapshot.mkdir(parents=True)
+    (snapshot / "config.json").write_text(
+        json.dumps(
+            {
+                "architectures": ["Qwen3_5ForConditionalGeneration"],
+                "text_config": {"max_position_embeddings": 262144},
+                "quantization_config": {
+                    "format": "pack-quantized",
+                    "config_groups": {"group_0": {"weights": {"num_bits": 4}}},
+                },
+            }
+        )
+    )
+
+    result = VLLMModelMetadataDiscovery(tmp_path).discover("RedHatAI/Qwen3.8-27B-INT4")
+
+    assert result["native_context_tokens"] == 262144
+    assert result["model_quantization"] == "INT4 pack-quantized"
 
 
 def test_build_normalized_configuration_llama_cpp() -> None:

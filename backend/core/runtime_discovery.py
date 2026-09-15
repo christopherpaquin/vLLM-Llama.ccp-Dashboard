@@ -399,6 +399,13 @@ class VLLMEndpointDiscovery:
         models_ok, models = read_json(f"{self.base_url}/v1/models")
         metrics_ok, metrics = read_text(f"{self.base_url}/metrics")
         first_model = ((models or {}).get("data") or [{}])[0] if models_ok else {}
+        kv_cache_utilization = self._metric(
+            metrics, "vllm:kv_cache_usage_perc", multiplier=100
+        )
+        if kv_cache_utilization is None:
+            kv_cache_utilization = self._metric(
+                metrics, "vllm:gpu_cache_usage_factor", multiplier=100
+            )
         return {
             "backend_type": "vllm",
             "backend_name": "vLLM",
@@ -407,10 +414,7 @@ class VLLMEndpointDiscovery:
             "active_model": first_model.get("root") or first_model.get("id"),
             "served_model_name": first_model.get("id"),
             "configured_max_model_len": first_model.get("max_model_len"),
-            "kv_cache_utilization_percent": self._metric(
-                metrics, "vllm:kv_cache_usage_perc", multiplier=100
-            )
-            or self._metric(metrics, "vllm:gpu_cache_usage_factor", multiplier=100),
+            "kv_cache_utilization_percent": kv_cache_utilization,
             "prompt_tokens_per_second": self._metric(
                 metrics, "vllm:avg_prompt_throughput_tok_per_s"
             ),
@@ -437,6 +441,59 @@ class VLLMEndpointDiscovery:
         )
         match = pattern.search(text)
         return float(match.group(1)) * multiplier if match else None
+
+
+class VLLMModelMetadataDiscovery:
+    """Read authoritative metadata for the active repository from the mounted cache."""
+
+    def __init__(self, cache_path: Path | None = None) -> None:
+        self.cache_path = cache_path or Path(
+            os.getenv("MODEL_CACHE_PATH", "/host/model-cache")
+        )
+
+    def discover(self, repository: str | None) -> dict[str, Any]:
+        if not repository or "/" not in repository:
+            return {}
+        owner, model = repository.split("/", 1)
+        snapshots = self.cache_path / f"models--{owner}--{model}" / "snapshots"
+        if not snapshots.is_dir():
+            return {}
+
+        configs = sorted(snapshots.glob("*/config.json"))
+        if not configs:
+            return {}
+        try:
+            config = json.loads(configs[-1].read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+        text_config = config.get("text_config") or {}
+        native_context = config.get("max_position_embeddings") or text_config.get(
+            "max_position_embeddings"
+        )
+        quant_config = config.get("quantization_config") or {}
+        quant_format = quant_config.get("format") or quant_config.get("quant_method")
+        groups = quant_config.get("config_groups") or {}
+        weight_bits = next(
+            (
+                group.get("weights", {}).get("num_bits")
+                for group in groups.values()
+                if group.get("weights", {}).get("num_bits")
+            ),
+            None,
+        )
+        quantization = None
+        if weight_bits and quant_format:
+            quantization = f"INT{weight_bits} {quant_format}"
+        elif quant_format:
+            quantization = str(quant_format)
+
+        return {
+            "native_context_tokens": native_context,
+            "model_quantization": quantization,
+            "model_architecture": (config.get("architectures") or [None])[0],
+            "metadata_source": "Hugging Face model config",
+        }
 
 
 class LlamaCppEndpointDiscovery:
@@ -578,8 +635,18 @@ class VLLMLogTelemetryParser:
             r"V1 LLM engine \(v([^\)]+)\)|vLLM version ([0-9a-zA-Z.+_-]+)"
         ),
         "gpu_blocks": re.compile(r"# GPU blocks: ([0-9,]+)"),
-        "chunked_prefill": re.compile(r"chunked prefill is ([a-zA-Z]+)"),
-        "prefix_caching": re.compile(r"prefix caching is ([a-zA-Z]+)"),
+        "chunked_prefill": re.compile(
+            r"(?:chunked prefill is |enable_chunked_prefill=)([a-zA-Z]+)"
+        ),
+        "prefix_caching": re.compile(
+            r"(?:prefix caching is |enable_prefix_caching=)([a-zA-Z]+)"
+        ),
+        "model_quantization": re.compile(r"\bquantization=([^,\s]+)"),
+        "model_dtype": re.compile(r"\bdtype=torch\.([^,\s]+)"),
+        "tensor_parallel_size": re.compile(r"\btensor_parallel_size=([0-9]+)"),
+        "pipeline_parallel_size": re.compile(r"\bpipeline_parallel_size=([0-9]+)"),
+        "data_parallel_size": re.compile(r"\bdata_parallel_size=([0-9]+)"),
+        "max_num_seqs": re.compile(r"['\"]?max_num_seqs['\"]?[:=]\s*([0-9]+)"),
     }
 
     @classmethod
@@ -593,7 +660,13 @@ class VLLMLogTelemetryParser:
             if isinstance(matched, tuple):
                 matched = next((m for m in matched if m), "")
             value = str(matched).replace(",", "")
-            if key in ("vllm_version", "chunked_prefill", "prefix_caching"):
+            if key in (
+                "vllm_version",
+                "chunked_prefill",
+                "prefix_caching",
+                "model_quantization",
+                "model_dtype",
+            ):
                 result[key] = value
             else:
                 try:
@@ -604,6 +677,10 @@ class VLLMLogTelemetryParser:
             "kv_cache_capacity_tokens",
             "effective_max_model_len",
             "gpu_blocks",
+            "tensor_parallel_size",
+            "pipeline_parallel_size",
+            "data_parallel_size",
+            "max_num_seqs",
         ):
             if integer_key in result:
                 result[integer_key] = int(result[integer_key])
@@ -903,11 +980,21 @@ def build_normalized_configuration(
             },
         ]
     else:
-        max_seqs = env.get("MAX_NUM_SEQS") or 4
+        max_seqs = env.get("MAX_NUM_SEQS") or inference.get("max_num_seqs") or 4
         max_batched = env.get("MAX_NUM_BATCHED_TOKENS") or "auto"
-        tp_size = env.get("TENSOR_PARALLEL_SIZE") or 1
-        pp_size = env.get("PIPELINE_PARALLEL_SIZE") or 1
-        dp_size = env.get("DATA_PARALLEL_SIZE") or 1
+        tp_size = (
+            env.get("TENSOR_PARALLEL_SIZE")
+            or inference.get("tensor_parallel_size")
+            or 1
+        )
+        pp_size = (
+            env.get("PIPELINE_PARALLEL_SIZE")
+            or inference.get("pipeline_parallel_size")
+            or 1
+        )
+        dp_size = (
+            env.get("DATA_PARALLEL_SIZE") or inference.get("data_parallel_size") or 1
+        )
         cpu_offload = env.get("CPU_OFFLOAD_GB") or 0
         swap = env.get("SWAP_SPACE") or 4
         scheduling_items = [
@@ -916,7 +1003,9 @@ def build_normalized_configuration(
                 "label": "Max Number of Sequences",
                 "value": max_seqs,
                 "formatted": str(max_seqs),
-                "source": "configured" if env.get("MAX_NUM_SEQS") else "default",
+                "source": "configured"
+                if env.get("MAX_NUM_SEQS")
+                else ("runtime" if inference.get("max_num_seqs") else "default"),
                 "tooltip": "Maximum number of active sequences vLLM may process concurrently. Higher values increase concurrency but consume more KV-cache memory.",
             },
             {
@@ -1411,6 +1500,11 @@ class CapabilityDiscoveryService:
             else VLLMEndpointDiscovery(inference_base_url())
         )
         endpoint = endpoint_provider.discover()
+        model_metadata = (
+            VLLMModelMetadataDiscovery().discover(endpoint.get("active_model"))
+            if backend == "vllm"
+            else {}
+        )
         logs = ""
         if docker.get("container"):
             try:
@@ -1443,7 +1537,7 @@ class CapabilityDiscoveryService:
         )
         attributed_process_vram = vllm_process_vram + external_process_vram
         total_used = sum(gpu.get("vram_used") or 0 for gpu in gpus)
-        inference_snapshot = {**endpoint, **log_telemetry}
+        inference_snapshot = {**endpoint, **log_telemetry, **model_metadata}
         memory_snapshot = {
             "vllm_process_vram_bytes": vllm_process_vram or None,
             "external_process_vram_bytes": external_process_vram,
